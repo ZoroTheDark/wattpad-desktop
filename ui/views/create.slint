@@ -1,8 +1,9 @@
+import { Palette } from "../palette.slint";
 // ui/views/create.slint
 import { LineEdit, TextEdit, Button } from "std-widgets.slint";
 
 export component CreateView inherits Rectangle {
-    background: #ffffff;
+    background: Palette.bg-color;
 
     in-out property <string> story-title: "";
     in-out property <string> story-content: "";
@@ -19,7 +20,7 @@ export component CreateView inherits Rectangle {
             text: "Crear Historia";
             font-size: 20px;
             font-weight: 700;
-            color: #222222;
+            color: Palette.text-color;
         }
 
         VerticalLayout {
@@ -29,7 +30,7 @@ export component CreateView inherits Rectangle {
                 text: "Título de la historia";
                 font-size: 13px;
                 font-weight: 600;
-                color: #444444;
+                color: Palette.text-color;
             }
 
             LineEdit {
@@ -47,7 +48,7 @@ export component CreateView inherits Rectangle {
                 text: "Contenido";
                 font-size: 13px;
                 font-weight: 600;
-                color: #444444;
+                color: Palette.text-color;
             }
 
             TextEdit {

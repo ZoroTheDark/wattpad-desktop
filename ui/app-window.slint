@@ -2,21 +2,30 @@
 import { LineEdit, Button } from "std-widgets.slint";
 import { HomeView } from "views/home.slint";
 import { SearchView } from "views/search.slint";
+import { SearchStoryItem } from "views/search.slint";
 import { LibraryView, LibraryStoryItem } from "views/library.slint";
 import { CreateView } from "views/create.slint";
 import { ProfileView } from "views/profile.slint";
 import { ReaderView } from "views/reader.slint";
+import { Palette } from "palette.slint";
 
 export { LibraryStoryItem }
+export { SearchStoryItem }
+export { Palette }
 
-component NavTabButton inherits Rectangle {
+component NavItem inherits Rectangle {
+    in property <bool> is-active: false;
+    in property <bool> is-dark: false;
     in property <string> label;
-    in property <bool> active: false;
+    in property <string> emoji;
+    in property <image> icon-light;
+    in property <image> icon-dark;
+    property <image> current-icon: root.is-dark ? root.icon-dark : root.icon-light;
     callback clicked();
 
     horizontal-stretch: 1;
     height: 100%;
-    background: touch.has-hover ? #fff5f0 : transparent;
+    background: touch.has-hover ? (root.is-dark ? #333333 : #fff5f0) : transparent;
 
     touch := TouchArea {
         mouse-cursor: pointer;
@@ -33,32 +42,48 @@ component NavTabButton inherits Rectangle {
             width: 24px;
             height: 3px;
             border-radius: 2px;
-            background: root.active ? #ff500a : transparent;
+            background: root.is-active ? #ff500a : transparent;
             x: (parent.width - self.width) / 2;
         }
 
-        Text {
-            text: root.label;
-            font-size: 13px;
-            font-weight: root.active ? 700 : 500;
-            color: root.active ? #ff500a : #666666;
-            horizontal-alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            spacing: 5px;
+            if root.current-icon.width > 0 : Image {
+                width: 20px;
+                height: 20px;
+                source: root.current-icon;
+                colorize: root.is-active ? #ff500a : (root.is-dark ? #ffffff : #666666);
+                image-fit: contain;
+            }
+            if root.current-icon.width == 0 : Text {
+                text: root.emoji;
+                font-size: 17px;
+                vertical-alignment: center;
+            }
+            Text {
+                text: root.label;
+                font-size: 13px;
+                font-weight: root.is-active ? 700 : 500;
+                color: root.is-active ? #ff500a : (root.is-dark ? #ffffff : #666666);
+                vertical-alignment: center;
+            }
         }
     }
 }
 
 export component AppWindow inherits Window {
     title: "Wattpad Desktop (Linux)";
-    preferred-width: 900px;
-    preferred-height: 720px;
+    preferred-width: 1024px;
+    preferred-height: 768px;
     min-width: 800px;
     min-height: 600px;
-    background: #ffffff;
+    background: Palette.bg-color;
 
     in-out property <string> username: "";
     in-out property <string> password: "";
     in-out property <string> search-query: "";
-    in-out property <[string]> search-results: [];
+    in-out property <[SearchStoryItem]> search-results: [];
     in-out property <[LibraryStoryItem]> home-stories: [];
     in-out property <[LibraryStoryItem]> library-stories: [];
     in-out property <string> draft-title: "";
@@ -66,6 +91,7 @@ export component AppWindow inherits Window {
     in-out property <string> draft-status-message: "";
     in-out property <bool> is-logged-in: false;
     in-out property <bool> is-loading: false;
+    in-out property <bool> is-dark-mode: false;
     in-out property <bool> is-offline: false;
     in-out property <string> error-message: "";
     in-out property <string> current-username: "";
@@ -83,10 +109,11 @@ export component AppWindow inherits Window {
     in-out property <int> reader-total-chapters: 0;
 
     callback login-requested(string, string);
-    callback search-requested(string);
+    callback search-requested(string, string);
     callback logout-requested();
     callback tab-selected(int);
     callback home-story-clicked(string);
+    callback search-story-clicked(string);
     callback save-draft-requested(string, string);
     callback download-story-requested(string);
     callback read-story-requested(string);
@@ -101,7 +128,7 @@ export component AppWindow inherits Window {
         // Barra superior estilo Wattpad
         Rectangle {
             height: 52px;
-            background: #ffffff;
+            background: root.is-dark-mode ? #202124 : #ffffff;
             border-width: 1px;
             border-color: #eeeeee;
 
@@ -119,11 +146,21 @@ export component AppWindow inherits Window {
                     vertical-alignment: center;
                 }
 
-                if root.is-logged-in : Text {
-                    text: root.is-offline ? "Sin conexión" : (root.current-username != "" ? "@" + root.current-username : "Conectado");
-                    color: root.is-offline ? #ff500a : #666666;
-                    font-size: 13px;
-                    vertical-alignment: center;
+                HorizontalLayout {
+                    spacing: 10px;
+                    if root.is-logged-in : Text {
+                        text: root.is-offline ? "Sin conexión" : (root.current-username != "" ? "@" + root.current-username : "Conectado");
+                        color: root.is-offline ? #ff500a : (root.is-dark-mode ? #ffffff : #666666);
+                        font-size: 13px;
+                        vertical-alignment: center;
+                    }
+                    Button {
+                        text: root.is-dark-mode ? "☀️ Claro" : "🌙 Oscuro";
+                        clicked => {
+                            root.is-dark-mode = !root.is-dark-mode;
+                            Palette.is-dark-mode = root.is-dark-mode;
+                        }
+                    }
                 }
             }
         }
@@ -139,13 +176,13 @@ export component AppWindow inherits Window {
                 text: "Inicia sesión en Wattpad";
                 font-size: 20px;
                 font-weight: 700;
-                color: #222222;
+                color: Palette.text-color;
             }
 
             Text {
                 text: "Usa tu nombre de usuario o correo electrónico y tu contraseña.";
                 font-size: 13px;
-                color: #666666;
+                color: Palette.text-color;
                 wrap: word-wrap;
             }
 
@@ -203,13 +240,13 @@ export component AppWindow inherits Window {
             // Área de contenido central
             Rectangle {
                 vertical-stretch: 1;
-                background: #ffffff;
+                background: Palette.bg-color;
 
                 if root.current-tab == 0 : HomeView {
                     width: 100%;
                     height: 100%;
                     stories <=> root.home-stories;
-                    is-loading: root.is-loading;
+                    is-loading <=> root.is-loading;
                     is-offline: root.is-offline;
                     story-clicked(story-id) => {
                         root.home-story-clicked(story-id);
@@ -223,8 +260,11 @@ export component AppWindow inherits Window {
                     search-results: root.search-results;
                     is-loading <=> root.is-loading;
                     error-message: root.error-message;
-                    search-requested(query) => {
-                        root.search-requested(query);
+                    search-requested(query, filters) => {
+                        root.search-requested(query, filters);
+                    }
+                    story-clicked(story-id) => {
+                        root.search-story-clicked(story-id);
                     }
                 }
 
@@ -275,49 +315,70 @@ export component AppWindow inherits Window {
             // Barra de navegación inferior (Bottom Navigation Bar)
             Rectangle {
                 height: 60px;
-                background: #ffffff;
+                background: root.is-dark-mode ? #202124 : #ffffff;
                 border-width: 1px;
                 border-color: #eeeeee;
 
                 HorizontalLayout {
                     padding: 0px;
                     spacing: 0px;
+                    alignment: center;
 
-                    NavTabButton {
+                    NavItem {
+                        is-dark: root.is-dark-mode;
+                        emoji: "🏠";
+                        icon-light: @image-url("icons/house.svg");
+                        icon-dark: @image-url("icons/house.svg");
                         label: "Inicio";
-                        active: root.current-tab == 0;
+                        is-active: root.current-tab == 0;
                         clicked => {
                             root.tab-selected(0);
                         }
                     }
 
-                    NavTabButton {
+                    NavItem {
+                        is-dark: root.is-dark-mode;
+                        emoji: "🔍";
+                        icon-light: @image-url("icons/search.svg");
+                        icon-dark: @image-url("icons/search.svg");
                         label: "Buscar";
-                        active: root.current-tab == 1;
+                        is-active: root.current-tab == 1;
                         clicked => {
                             root.tab-selected(1);
                         }
                     }
 
-                    NavTabButton {
+                    NavItem {
+                        is-dark: root.is-dark-mode;
+                        emoji: "📚";
+                        icon-light: @image-url("icons/layers.svg");
+                        icon-dark: @image-url("icons/layers.svg");
                         label: "Biblioteca";
-                        active: root.current-tab == 2;
+                        is-active: root.current-tab == 2;
                         clicked => {
                             root.tab-selected(2);
                         }
                     }
 
-                    NavTabButton {
+                    NavItem {
+                        is-dark: root.is-dark-mode;
+                        emoji: "✍️";
+                        icon-light: @image-url("icons/plus.svg");
+                        icon-dark: @image-url("icons/plus.svg");
                         label: "Crear";
-                        active: root.current-tab == 3;
+                        is-active: root.current-tab == 3;
                         clicked => {
                             root.tab-selected(3);
                         }
                     }
 
-                    NavTabButton {
+                    NavItem {
+                        is-dark: root.is-dark-mode;
+                        emoji: "👤";
+                        icon-light: @image-url("icons/circle-user-round.svg");
+                        icon-dark: @image-url("icons/circle-user-round.svg");
                         label: "Perfil";
-                        active: root.current-tab == 4;
+                        is-active: root.current-tab == 4;
                         clicked => {
                             root.tab-selected(4);
                         }

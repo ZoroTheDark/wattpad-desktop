@@ -28,6 +28,7 @@ fn actualizar_capitulo_en_ui(app: &AppWindow, state: &AppState) {
             state.opened_story_title.clone(),
             state.opened_chapters.clone(),
             state.current_chapter_index,
+            app.get_is_dark_mode(),
         );
         app.set_is_reading(false);
         app.set_is_loading(false);
@@ -74,6 +75,10 @@ fn cargar_datos_usuario(
     state_arc: Arc<Mutex<AppState>>,
     wp_client: Arc<WattpadClient>,
 ) {
+    if let Some(app) = app_weak.upgrade() {
+        app.set_is_loading(true);
+        app.set_error_message("".into());
+    }
     slint::spawn_local(Compat::new(async move {
         // 1. Cargar perfil de usuario
         match api::obtener_perfil(&wp_client).await {
@@ -146,25 +151,7 @@ fn cargar_datos_usuario(
         }
         if let Some(app) = app_weak.upgrade() {
             app.set_library_stories(slint::ModelRc::new(slint::VecModel::from(ui_items)));
-        }
-    }))
-    .unwrap();
-}
-
-fn cargar_destacados_home(
-    app_weak: slint::Weak<AppWindow>,
-    state_arc: Arc<Mutex<AppState>>,
-    wp_client: Arc<WattpadClient>,
-) {
-    slint::spawn_local(Compat::new(async move {
-        if let Ok(destacados) = api::obtener_destacados(&wp_client).await {
-            let home_ui_items = construir_items_biblioteca(&destacados).await;
-            if let Ok(mut state) = state_arc.lock() {
-                state.home_stories = destacados;
-            }
-            if let Some(app) = app_weak.upgrade() {
-                app.set_home_stories(slint::ModelRc::new(slint::VecModel::from(home_ui_items)));
-            }
+            app.set_is_loading(false);
         }
     }))
     .unwrap();
@@ -264,6 +251,10 @@ fn abrir_historia_para_lectura(
                 }
             }
         }
+
+        if let Some(app) = app_weak.upgrade() {
+            app.set_is_loading(false);
+        }
     }))
     .unwrap();
 }
@@ -319,8 +310,6 @@ fn main() -> Result<(), slint::PlatformError> {
     let http_client = Arc::new(http_client);
 
     let app_handle = app.as_weak();
-    cargar_destacados_home(app_handle.clone(), Arc::clone(&app_state), Arc::clone(&wp_client));
-
     // Si hay una cookie `token` guardada, verificamos con Wattpad si sigue vigente.
     if tiene_sesion {
         app.set_is_loading(true);
@@ -499,6 +488,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     }
                 }
             }
+
         }))
         .unwrap();
     });
@@ -546,10 +536,11 @@ fn main() -> Result<(), slint::PlatformError> {
     let app_handle_search = app_handle.clone();
     let wp_search = Arc::clone(&wp_client);
 
-    app.on_search_requested(move |query| {
+    app.on_search_requested(move |query, filters| {
         let app_weak = app_handle_search.clone();
         let wp = Arc::clone(&wp_search);
         let q = query.to_string();
+        let filtros = filters.to_string();
 
         if q.trim().is_empty() {
             return;
@@ -558,22 +549,37 @@ fn main() -> Result<(), slint::PlatformError> {
         if let Some(app) = app_weak.upgrade() {
             app.set_is_loading(true);
             app.set_error_message("".into());
+            app.set_search_results(slint::ModelRc::default());
         }
 
         slint::spawn_local(Compat::new(async move {
-            match api::buscar_historias(&q, &wp).await {
+            match api::buscar_historias(&q, &filtros, &wp).await {
                 Ok(stories) => {
-                    let titulos: Vec<slint::SharedString> = if stories.is_empty() {
-                        vec![slint::SharedString::from("No se encontraron historias.")]
-                    } else {
-                        stories
-                            .into_iter()
-                            .map(slint::SharedString::from)
-                            .collect()
-                    };
+                    let mut items = Vec::with_capacity(stories.len());
+                    for story in stories {
+                        let cover = api::descargar_imagen_cache(
+                            &story.cover_url,
+                            &format!("search_cover_{}", story.id),
+                        )
+                        .await
+                        .and_then(|path| slint::Image::load_from_path(&path).ok())
+                        .unwrap_or_default();
+                        items.push(SearchStoryItem {
+                            id: story.id.into(),
+                            title: story.title.into(),
+                            author: story.author.into(),
+                            description: story.description.into(),
+                            cover,
+                            reads: story.reads.min(i32::MAX as u64) as i32,
+                            votes: story.votes.min(i32::MAX as u64) as i32,
+                            parts: story.parts.min(i32::MAX as u32) as i32,
+                            is_completed: story.is_completed,
+                            is_mature: story.is_mature,
+                        });
+                    }
 
                     if let Some(app) = app_weak.upgrade() {
-                        app.set_search_results(slint::ModelRc::new(slint::VecModel::from(titulos)));
+                        app.set_search_results(slint::ModelRc::new(slint::VecModel::from(items)));
                         app.set_is_loading(false);
                     }
                 }
@@ -587,6 +593,18 @@ fn main() -> Result<(), slint::PlatformError> {
             }
         }))
         .unwrap();
+    });
+
+    let app_handle_search_story = app_handle.clone();
+    let state_search_story = Arc::clone(&app_state);
+    let wp_search_story = Arc::clone(&wp_client);
+    app.on_search_story_clicked(move |story_id| {
+        abrir_historia_para_lectura(
+            app_handle_search_story.clone(),
+            Arc::clone(&state_search_story),
+            Some(Arc::clone(&wp_search_story)),
+            story_id.to_string(),
+        );
     });
 
     // --- Descarga de historia completa (EPUB cifrado) para lectura offline ---
@@ -607,7 +625,13 @@ fn main() -> Result<(), slint::PlatformError> {
 
         slint::spawn_local(Compat::new(async move {
             let (username, password, salt) = {
-                let mut state = state_arc.lock().unwrap();
+                let Ok(mut state) = state_arc.lock() else {
+                    if let Some(app) = app_weak.upgrade() {
+                        app.set_error_message("No se pudo acceder al estado de la aplicación.".into());
+                        app.set_is_loading(false);
+                    }
+                    return;
+                };
                 if state.session_salt == [0u8; crypto::SALT_LEN] {
                     state.session_salt = crypto::generar_salt();
                 }
@@ -645,6 +669,10 @@ fn main() -> Result<(), slint::PlatformError> {
                         app.set_is_loading(false);
                     }
                 }
+            }
+
+            if let Some(app) = app_weak.upgrade() {
+                app.set_is_loading(false);
             }
         }))
         .unwrap();

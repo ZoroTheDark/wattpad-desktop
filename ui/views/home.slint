@@ -1,12 +1,13 @@
+import { Palette } from "../palette.slint";
 // ui/views/home.slint
-import { ListView } from "std-widgets.slint";
+import { ListView, Spinner } from "std-widgets.slint";
 import { LibraryStoryItem } from "library.slint";
 
 export component HomeView inherits Rectangle {
-    background: #ffffff;
+    background: Palette.bg-color;
 
     in-out property <[LibraryStoryItem]> stories: [];
-    in property <bool> is-loading: false;
+    in-out property <bool> is-loading: false;
     in property <bool> is-offline: false;
 
     callback story-clicked(string);
@@ -22,7 +23,7 @@ export component HomeView inherits Rectangle {
                 text: "Inicio - Destacados";
                 font-size: 20px;
                 font-weight: 700;
-                color: #222222;
+                color: Palette.text-color;
             }
 
             if root.is-offline : Text {
@@ -35,7 +36,7 @@ export component HomeView inherits Rectangle {
 
         if root.stories.length == 0 : Rectangle {
             vertical-stretch: 1;
-            background: #fafafa;
+            background: Palette.card-color;
             border-width: 1px;
             border-color: #eeeeee;
             border-radius: 8px;
@@ -49,14 +50,14 @@ export component HomeView inherits Rectangle {
                     text: root.is-loading ? "Cargando destacados..." : "Descubre nuevas historias";
                     font-size: 16px;
                     font-weight: 600;
-                    color: #222222;
+                    color: Palette.text-color;
                     horizontal-alignment: center;
                 }
 
                 Text {
                     text: "Las historias recomendadas y populares aparecerán aquí.";
                     font-size: 13px;
-                    color: #666666;
+                    color: Palette.text-color;
                     horizontal-alignment: center;
                     wrap: word-wrap;
                 }
@@ -64,13 +65,14 @@ export component HomeView inherits Rectangle {
         }
 
         if root.stories.length > 0 : ListView {
+            horizontal-stretch: 1;
             vertical-stretch: 1;
             for story in root.stories: Rectangle {
                 height: 92px;
                 border-width: 1px;
                 border-color: touch.has-hover ? #ff500a : #eeeeee;
                 border-radius: 8px;
-                background: touch.has-hover ? #fff8f5 : #fafafa;
+                background: touch.has-hover ? Palette.card-color : Palette.bg-color;
 
                 touch := TouchArea {
                     mouse-cursor: pointer;
@@ -116,14 +118,14 @@ export component HomeView inherits Rectangle {
                             text: story.title;
                             font-size: 14px;
                             font-weight: 600;
-                            color: #222222;
+                            color: Palette.text-color;
                             overflow: elide;
                         }
 
                         Text {
                             text: story.author;
                             font-size: 12px;
-                            color: #666666;
+                            color: Palette.text-color;
                             overflow: elide;
                         }
                     }
@@ -137,6 +139,20 @@ export component HomeView inherits Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    if root.is-loading : Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: Palette.bg-color;
+        VerticalLayout {
+            alignment: center;
+            spacing: 10px;
+            Spinner { indeterminate: true; width: 36px; height: 36px; }
+            Text { text: "Cargando..."; color: Palette.text-color; font-size: 14px; horizontal-alignment: center; }
         }
     }
 }

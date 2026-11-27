@@ -32,13 +32,17 @@ pub struct LibraryStory {
 }
 
 #[derive(Debug, Clone)]
-pub struct StorySummary {
-    #[allow(dead_code)]
+pub struct SearchStory {
     pub id: String,
     pub title: String,
     pub author: String,
-    pub parts: u64,
+    pub cover_url: String,
+    pub reads: u64,
     pub votes: u64,
+    pub parts: u32,
+    pub is_completed: bool,
+    pub is_mature: bool,
+    pub description: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,10 +91,20 @@ struct SearchResponse {
 struct SearchStoryItem {
     id: String,
     title: String,
+    #[serde(default)]
+    cover: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default, rename = "numReads")]
+    num_reads: u64,
     #[serde(default, rename = "numParts")]
     num_parts: u64,
     #[serde(default, rename = "voteCount")]
     vote_count: u64,
+    #[serde(default)]
+    completed: bool,
+    #[serde(default)]
+    mature: bool,
     user: Option<SearchStoryAuthor>,
 }
 
@@ -123,8 +137,9 @@ fn obtener_http_client() -> &'static reqwest::Client {
 /// Devuelve los resultados formateados para la interfaz de usuario.
 pub async fn buscar_historias(
     query: &str,
+    filtros: &str,
     client: &WattpadClient,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<SearchStory>, String> {
     let q = query.trim();
     if q.is_empty() {
         return Ok(Vec::new());
@@ -136,16 +151,59 @@ pub async fn buscar_historias(
     let _ = client;
     let http = obtener_http_client();
 
+    let mut params = vec![
+        ("query".to_string(), q.to_string()),
+        ("limit".to_string(), "20".to_string()),
+        (
+            "fields".to_string(),
+            "stories(id,title,cover,description,numReads,numParts,voteCount,completed,mature,user(name,fullname))".to_string(),
+        ),
+    ];
+    let opciones: std::collections::HashMap<&str, &str> = filtros
+        .split(';')
+        .filter_map(|option| option.split_once('='))
+        .collect();
+
+    match opciones.get("length").copied().unwrap_or("0") {
+        "1" => params.extend([("minParts".into(), "1".into()), ("maxParts".into(), "10".into())]),
+        "2" => params.extend([("minParts".into(), "10".into()), ("maxParts".into(), "20".into())]),
+        "3" => params.extend([("minParts".into(), "20".into()), ("maxParts".into(), "50".into())]),
+        "4" => params.push(("minParts".into(), "50".into())),
+        _ => {}
+    }
+
+    if opciones.get("updated").copied().unwrap_or("0") != "0" {
+        let updated = match opciones.get("updated").copied().unwrap_or("0") {
+            "1" => "today",
+            "2" => "week",
+            "3" => "month",
+            "4" => "year",
+            _ => "",
+        };
+        if !updated.is_empty() {
+            // TODO: Confirmar el nombre y los valores aceptados por Wattpad para el filtro de actualización.
+            params.push(("lastUpdated".into(), updated.into()));
+        }
+    }
+
+    if opciones.get("completed") == Some(&"true") {
+        params.push(("filter".into(), "complete".into()));
+    }
+    if opciones.get("hide_mature") == Some(&"true") {
+        params.push(("mature".into(), "false".into()));
+    }
+    if opciones.get("hide_free") == Some(&"true") {
+        // TODO: Confirmar el parámetro de Wattpad para excluir historias gratuitas.
+        params.push(("paid".into(), "true".into()));
+    }
+    if let Some(tags) = opciones.get("tags").map(|tags| tags.trim()).filter(|tags| !tags.is_empty()) {
+        // TODO: Confirmar si Wattpad admite un parámetro tags independiente en esta ruta.
+        params.push(("tags".into(), tags.to_string()));
+    }
+
     let response = http
         .get("https://api.wattpad.com/v4/search/stories")
-        .query(&[
-            ("query", q),
-            ("limit", "20"),
-            (
-                "fields",
-                "stories(id,title,numParts,voteCount,user(name,fullname))",
-            ),
-        ])
+        .query(&params)
         .header("Accept", "application/json")
         .send()
         .await
@@ -172,17 +230,18 @@ pub async fn buscar_historias(
                 .user
                 .and_then(|u| u.fullname.filter(|n| !n.is_empty()).or(u.name))
                 .unwrap_or_else(|| "Autor desconocido".to_string());
-            let summary = StorySummary {
+            SearchStory {
                 id: s.id,
                 title: s.title,
                 author,
-                parts: s.num_parts,
+                cover_url: s.cover.unwrap_or_default(),
+                reads: s.num_reads,
                 votes: s.vote_count,
-            };
-            format!(
-                "{} — por {} ({} partes · {} votos)",
-                summary.title, summary.author, summary.parts, summary.votes
-            )
+                parts: s.num_parts.min(u32::MAX as u64) as u32,
+                is_completed: s.completed,
+                is_mature: s.mature,
+                description: s.description.unwrap_or_default(),
+            }
         })
         .collect();
 

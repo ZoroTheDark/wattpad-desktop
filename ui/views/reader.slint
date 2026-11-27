@@ -1,8 +1,9 @@
 // ui/views/reader.slint
+import { Palette } from "../palette.slint";
 import { Button, Spinner } from "std-widgets.slint";
 
 export component ReaderView inherits Rectangle {
-    background: #ffffff;
+    background: Palette.bg-color;
 
     in property <string> story-title: "";
     in property <string> chapter-title: "";
@@ -19,7 +20,7 @@ export component ReaderView inherits Rectangle {
 
         Rectangle {
             height: 54px;
-            background: #ffffff;
+            background: Palette.card-color;
             border-width: 1px;
             border-color: #eeeeee;
 
@@ -40,7 +41,7 @@ export component ReaderView inherits Rectangle {
                     text: root.story-title != "" ? root.story-title : "Lector Web";
                     font-size: 15px;
                     font-weight: 700;
-                    color: #222222;
+                    color: Palette.text-color;
                     vertical-alignment: center;
                     overflow: elide;
                     horizontal-stretch: 1;
@@ -49,7 +50,7 @@ export component ReaderView inherits Rectangle {
                 if root.total-chapters > 0 : Text {
                     text: (root.current-chapter-index + 1) + " / " + root.total-chapters;
                     font-size: 12px;
-                    color: #666666;
+                    color: Palette.text-color;
                     vertical-alignment: center;
                 }
             }
@@ -75,14 +76,14 @@ export component ReaderView inherits Rectangle {
                 text: "Abriendo lector...";
                 font-size: 16px;
                 font-weight: 700;
-                color: #222222;
+                color: Palette.text-color;
                 horizontal-alignment: center;
             }
 
             if root.chapter-title != "" : Text {
                 text: root.chapter-title;
                 font-size: 13px;
-                color: #666666;
+                color: Palette.text-color;
                 horizontal-alignment: center;
                 wrap: word-wrap;
             }
@@ -90,7 +91,7 @@ export component ReaderView inherits Rectangle {
 
         if root.total-chapters > 1 : Rectangle {
             height: 54px;
-            background: #fafafa;
+            background: Palette.card-color;
             border-width: 1px;
             border-color: #eeeeee;
 

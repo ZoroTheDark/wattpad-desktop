@@ -13,8 +13,8 @@ const CSS_LECTOR: &str = r#"
     line-height: 1.6;
     max-width: 800px;
     margin: auto;
-    background-color: #18181b;
-    color: #f4f4f5;
+    background-color: #121212;
+    color: #e0e0e0;
     font-size: 18px;
     word-wrap: break-word;
   }
@@ -29,7 +29,7 @@ const CSS_LECTOR: &str = r#"
     border-radius: 6px;
   }
   a {
-    color: #ff7846;
+    color: #66b2ff;
   }
   .barra-navegacion {
     position: fixed;
@@ -41,14 +41,14 @@ const CSS_LECTOR: &str = r#"
     align-items: center;
     gap: 12px;
     padding: 12px 24px;
-    background-color: rgba(24, 24, 27, 0.95);
-    border-top: 1px solid #3f3f46;
+    background-color: rgba(18, 18, 18, 0.95);
+    border-top: 1px solid #2d2d2d;
     backdrop-filter: blur(8px);
     z-index: 1000;
   }
   .indicador-capitulo {
     font-size: 14px;
-    color: #a1a1aa;
+    color: #9a9a9a;
   }
   .btn-nav {
     background-color: #ff7846;
@@ -66,7 +66,7 @@ const CSS_LECTOR: &str = r#"
   .btn-nav:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-    background-color: #3f3f46;
+    background-color: #2d2d2d;
   }
 </style>
 "#;
@@ -77,6 +77,7 @@ struct EstadoLector {
     story_title: String,
     capitulos: Vec<DbChapter>,
     indice_actual: usize,
+    is_dark: bool,
 }
 
 fn escapar_html_titulo(texto: &str) -> String {
@@ -135,24 +136,52 @@ fn inyectar_antes_de_cierre_body(html: &str, fragmento: &str) -> String {
     }
 }
 
-fn construir_html_completo(titulo: &str, html: &str, indice: usize, total: usize) -> String {
+fn css_lector(is_dark: bool) -> String {
+    if is_dark {
+        return format!(
+            "{}<style>body {{ background-color: #121212; color: #e0e0e0; }} a {{ color: #66b2ff; }}</style>",
+            CSS_LECTOR
+        );
+    }
+
+    let css_claro = CSS_LECTOR
+        .replace("#121212", "#ffffff")
+        .replace("#e0e0e0", "#222222")
+        .replace("#66b2ff", "#0645ad")
+        .replace("rgba(18, 18, 18, 0.95)", "rgba(255, 255, 255, 0.95)")
+        .replace("#2d2d2d", "#dddddd")
+        .replace("#9a9a9a", "#666666");
+    format!(
+        "{}<style>body {{ background-color: #ffffff; color: #222222; }} a {{ color: #0645ad; }}</style>",
+        css_claro
+    )
+}
+
+fn construir_html_completo(
+    titulo: &str,
+    html: &str,
+    indice: usize,
+    total: usize,
+    is_dark: bool,
+) -> String {
     let barra = construir_barra_navegacion(indice, total);
+    let css = css_lector(is_dark);
     let lower = html.to_ascii_lowercase();
 
     if let Some(pos) = lower.find("</head>") {
-        let mut con_css = String::with_capacity(html.len() + CSS_LECTOR.len());
+        let mut con_css = String::with_capacity(html.len() + css.len());
         con_css.push_str(&html[..pos]);
-        con_css.push_str(CSS_LECTOR);
+        con_css.push_str(&css);
         con_css.push_str(&html[pos..]);
         return inyectar_antes_de_cierre_body(&con_css, &barra);
     }
 
     if lower.contains("<html") {
         if let Some(pos) = lower.find("<body") {
-            let mut con_css = String::with_capacity(html.len() + CSS_LECTOR.len() + 36);
+            let mut con_css = String::with_capacity(html.len() + css.len() + 36);
             con_css.push_str(&html[..pos]);
             con_css.push_str("<head><meta charset=\"utf-8\">");
-            con_css.push_str(CSS_LECTOR);
+            con_css.push_str(&css);
             con_css.push_str("</head>");
             con_css.push_str(&html[pos..]);
             return inyectar_antes_de_cierre_body(&con_css, &barra);
@@ -162,7 +191,7 @@ fn construir_html_completo(titulo: &str, html: &str, indice: usize, total: usize
     let titulo_escapado = escapar_html_titulo(titulo);
     format!(
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>{}</title>{}</head><body><h1>{}</h1>{}{}</body></html>",
-        titulo_escapado, CSS_LECTOR, titulo_escapado, html, barra
+        titulo_escapado, css, titulo_escapado, html, barra
     )
 }
 
@@ -190,6 +219,7 @@ fn construir_vista_capitulo(estado: &EstadoLector) -> Option<(String, String)> {
         &chapter.content,
         estado.indice_actual,
         estado.capitulos.len(),
+        estado.is_dark,
     );
     Some((titulo, html))
 }
@@ -362,6 +392,7 @@ pub fn abrir_lector(
     story_title: String,
     mut capitulos: Vec<DbChapter>,
     indice_actual: usize,
+    is_dark: bool,
 ) {
     if capitulos.is_empty() && !story_id.trim().is_empty() {
         if let Ok(conn) = db::inicializar_db() {
@@ -382,6 +413,7 @@ pub fn abrir_lector(
         story_title,
         capitulos,
         indice_actual: indice_valido,
+        is_dark,
     };
 
     #[cfg(target_os = "linux")]
@@ -404,7 +436,7 @@ mod tests {
 
     #[test]
     fn inyecta_barra_navegacion_y_script_ipc() {
-        let html = construir_html_completo("Cap 1", "<p>Texto</p>", 0, 3);
+        let html = construir_html_completo("Cap 1", "<p>Texto</p>", 0, 3, true);
         assert!(html.contains("window.ipc.postMessage('siguiente')"));
         assert!(html.contains("window.ipc.postMessage('anterior')"));
         assert!(html.contains("window.scrollTo(0, 0);"));
@@ -414,7 +446,7 @@ mod tests {
 
     #[test]
     fn construye_script_reemplazo_html_escapado() {
-        let html = construir_html_completo("Cap \"2\"", "<p>Línea 1\nLínea 2</p>", 1, 3);
+        let html = construir_html_completo("Cap \"2\"", "<p>Línea 1\nLínea 2</p>", 1, 3, true);
         let script = construir_script_reemplazo_html(&html).unwrap();
         assert!(script.contains("document.open();"));
         assert!(script.contains("document.write("));

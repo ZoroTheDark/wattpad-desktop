@@ -1,0 +1,6 @@
+export global Palette {
+    in-out property <bool> is-dark-mode: false;
+    out property <color> bg-color: is-dark-mode ? #121212 : #ffffff;
+    out property <color> text-color: is-dark-mode ? #e0e0e0 : #222222;
+    out property <color> card-color: is-dark-mode ? #1e1e1e : #fafafa;
+}

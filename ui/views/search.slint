@@ -1,68 +1,72 @@
+import { Palette } from "../palette.slint";
 // ui/views/search.slint
-import { LineEdit, Button, ListView, Spinner } from "std-widgets.slint";
+import { LineEdit, Button, ListView, Spinner, ScrollView, CheckBox } from "std-widgets.slint";
+
+export struct SearchStoryItem {
+    id: string,
+    title: string,
+    author: string,
+    description: string,
+    cover: image,
+    reads: int,
+    votes: int,
+    parts: int,
+    is_completed: bool,
+    is_mature: bool,
+}
 
 export component SearchView inherits Rectangle {
-    background: #ffffff;
+    background: Palette.bg-color;
 
     in-out property <string> search-query: "";
-    in property <[string]> search-results: [];
+    in property <[SearchStoryItem]> search-results: [];
     in-out property <bool> is-loading: false;
     in property <string> error-message: "";
+    in-out property <int> length-filter: 0;
+    in-out property <int> update-filter: 0;
+    in-out property <bool> completed-only: false;
+    in-out property <bool> hide-mature: false;
+    in-out property <bool> hide-free: false;
+    in-out property <string> tags-filter: "";
 
-    callback search-requested(string);
+    callback search-requested(string, string);
+    callback story-clicked(string);
+
+    function filters-as-string() -> string {
+        return "length=" + root.length-filter + ";updated=" + root.update-filter
+            + ";completed=" + (root.completed-only ? "true" : "false")
+            + ";hide_mature=" + (root.hide-mature ? "true" : "false")
+            + ";hide_free=" + (root.hide-free ? "true" : "false") + ";tags=" + root.tags-filter;
+    }
 
     VerticalLayout {
         padding: 16px;
         spacing: 12px;
 
-        Text {
-            text: "Buscar";
-            font-size: 20px;
-            font-weight: 700;
-            color: #222222;
-        }
+        Text { text: "Buscar"; font-size: 20px; font-weight: 700; color: Palette.text-color; }
 
         HorizontalLayout {
             spacing: 8px;
-
             LineEdit {
                 placeholder-text: "Buscar historias en Wattpad...";
                 text <=> root.search-query;
                 enabled: !root.is-loading;
                 horizontal-stretch: 1;
-                accepted => {
-                    if !root.is-loading {
-                        root.search-requested(root.search-query);
-                    }
-                }
+                accepted => { if !root.is-loading { root.search-requested(root.search-query, root.filters-as-string()); } }
             }
-
             Button {
                 text: root.is-loading ? "Buscando..." : "Buscar";
                 primary: true;
                 enabled: !root.is-loading;
-                clicked => {
-                    root.search-requested(root.search-query);
-                }
+                clicked => { root.search-requested(root.search-query, root.filters-as-string()); }
             }
         }
 
         if root.is-loading : HorizontalLayout {
             alignment: center;
             spacing: 8px;
-
-            Spinner {
-                indeterminate: true;
-                width: 24px;
-                height: 24px;
-            }
-
-            Text {
-                text: "Cargando...";
-                font-size: 13px;
-                color: #666666;
-                vertical-alignment: center;
-            }
+            Spinner { indeterminate: true; width: 24px; height: 24px; }
+            Text { text: "Cargando..."; font-size: 13px; color: Palette.text-color; vertical-alignment: center; }
         }
 
         if root.error-message != "" : Rectangle {
@@ -70,38 +74,120 @@ export component SearchView inherits Rectangle {
             border-width: 1px;
             border-color: #f5b5a8;
             border-radius: 6px;
-
             HorizontalLayout {
                 padding: 10px;
-                Text {
-                    text: root.error-message;
-                    color: #b42318;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
+                Text { text: root.error-message; color: #b42318; font-size: 13px; wrap: word-wrap; }
             }
         }
 
-        ListView {
+        HorizontalLayout {
             vertical-stretch: 1;
-            for result in root.search-results: Rectangle {
-                height: 44px;
-                border-width: 1px;
-                border-color: #f0f0f0;
-                border-radius: 6px;
+            spacing: 16px;
 
-                HorizontalLayout {
-                    padding-left: 12px;
-                    padding-right: 12px;
-                    Text {
-                        text: result;
-                        font-size: 14px;
-                        color: #222222;
-                        vertical-alignment: center;
-                        overflow: elide;
+            ScrollView {
+                preferred-width: 250px;
+                min-width: 200px;
+                max-width: 250px;
+                horizontal-stretch: 0;
+                vertical-stretch: 1;
+                VerticalLayout {
+                    spacing: 8px;
+                    Text { text: "Filtros"; font-size: 16px; font-weight: 700; color: Palette.text-color; }
+
+                    Text { text: "Longitud"; font-size: 14px; font-weight: 700; color: Palette.text-color; }
+                    CheckBox { text: "Cualquier Extensión"; checked: root.length-filter == 0; toggled => { root.length-filter = 0; } }
+                    CheckBox { text: "1-10 partes"; checked: root.length-filter == 1; toggled => { root.length-filter = 1; } }
+                    CheckBox { text: "10-20 partes"; checked: root.length-filter == 2; toggled => { root.length-filter = 2; } }
+                    CheckBox { text: "20-50 partes"; checked: root.length-filter == 3; toggled => { root.length-filter = 3; } }
+                    CheckBox { text: "50+ partes"; checked: root.length-filter == 4; toggled => { root.length-filter = 4; } }
+
+                    Text { text: "Última actualización"; font-size: 14px; font-weight: 700; color: Palette.text-color; }
+                    CheckBox { text: "Cualquier momento"; checked: root.update-filter == 0; toggled => { root.update-filter = 0; } }
+                    CheckBox { text: "Hoy"; checked: root.update-filter == 1; toggled => { root.update-filter = 1; } }
+                    CheckBox { text: "Esta semana"; checked: root.update-filter == 2; toggled => { root.update-filter = 2; } }
+                    CheckBox { text: "Este mes"; checked: root.update-filter == 3; toggled => { root.update-filter = 3; } }
+                    CheckBox { text: "Este año"; checked: root.update-filter == 4; toggled => { root.update-filter = 4; } }
+
+                    Text { text: "Contenido"; font-size: 14px; font-weight: 700; color: Palette.text-color; }
+                    CheckBox { text: "Mostrar solo completas"; checked <=> root.completed-only; }
+                    CheckBox { text: "Ocultar maduras"; checked <=> root.hide-mature; }
+                    CheckBox { text: "Ocultar historias gratis"; checked <=> root.hide-free; }
+
+                    Text { text: "Etiquetas"; font-size: 14px; font-weight: 700; color: Palette.text-color; }
+                    LineEdit {
+                        placeholder-text: "Separadas por comas";
+                        text <=> root.tags-filter;
                     }
                 }
             }
+
+            ListView {
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+                for story in root.search-results: Rectangle {
+                    height: 132px;
+                    border-width: 1px;
+                    border-color: #eeeeee;
+                    border-radius: 8px;
+                    background: touch.has-hover ? Palette.card-color : Palette.bg-color;
+                    clip: true;
+
+                    touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.story-clicked(story.id); }
+                    }
+
+                    HorizontalLayout {
+                        padding: 10px;
+                        spacing: 12px;
+                        Rectangle {
+                            width: 76px;
+                            height: 112px;
+                            border-radius: 4px;
+                            background: #ffe8df;
+                            clip: true;
+                            if story.cover.width > 0 : Image {
+                                width: 100%; height: 100%; source: story.cover; image-fit: cover;
+                            }
+                            if story.cover.width == 0 : Text {
+                                text: "WP"; color: #ff500a; font-size: 16px; font-weight: 700;
+                                horizontal-alignment: center; vertical-alignment: center;
+                            }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 5px;
+                            Text { text: story.title; font-size: 16px; font-weight: 700; color: Palette.text-color; overflow: elide; }
+                            Text { text: "por " + story.author; font-size: 13px; color: Palette.text-color; overflow: elide; }
+                            Text {
+                                text: "Lecturas " + story.reads + "   ·   Votos " + story.votes + "   ·   Partes " + story.parts;
+                                font-size: 12px; color: Palette.text-color; overflow: elide;
+                            }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                if story.is_completed : Text { text: "Completa"; color: #3b7a57; font-size: 11px; }
+                                if !story.is_completed : Text { text: "Continua"; color: Palette.text-color; font-size: 11px; }
+                                if story.is_mature : Text { text: "Madura"; color: #9b4d00; font-size: 11px; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.is-loading : Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: Palette.bg-color;
+        VerticalLayout {
+            alignment: center;
+            spacing: 10px;
+            Spinner { indeterminate: true; width: 36px; height: 36px; }
+            Text { text: "Buscando..."; color: Palette.text-color; font-size: 14px; horizontal-alignment: center; }
         }
     }
 }

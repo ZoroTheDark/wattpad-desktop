@@ -1,8 +1,9 @@
+import { Palette } from "../palette.slint";
 // ui/views/profile.slint
 import { Button } from "std-widgets.slint";
 
 export component ProfileView inherits Rectangle {
-    background: #ffffff;
+    background: Palette.bg-color;
 
     in-out property <string> username: "";
     in-out property <string> full-name: "";
@@ -25,11 +26,11 @@ export component ProfileView inherits Rectangle {
             text: "Perfil";
             font-size: 20px;
             font-weight: 700;
-            color: #222222;
+            color: Palette.text-color;
         }
 
         Rectangle {
-            background: #fafafa;
+            background: Palette.card-color;
             border-width: 1px;
             border-color: #eeeeee;
             border-radius: 10px;
@@ -78,14 +79,14 @@ export component ProfileView inherits Rectangle {
                             text: root.full-name != "" ? root.full-name : (root.username != "" ? "@" + root.username : "Usuario conectado");
                             font-size: 17px;
                             font-weight: 700;
-                            color: #222222;
+                            color: Palette.text-color;
                             overflow: elide;
                         }
 
                         Text {
                             text: root.username != "" ? "@" + root.username : "";
                             font-size: 13px;
-                            color: #666666;
+                            color: Palette.text-color;
                             overflow: elide;
                         }
 
@@ -100,7 +101,7 @@ export component ProfileView inherits Rectangle {
                 if root.description != "" : Text {
                     text: root.description;
                     font-size: 13px;
-                    color: #444444;
+                    color: Palette.text-color;
                     wrap: word-wrap;
                 }
 
@@ -110,7 +111,7 @@ export component ProfileView inherits Rectangle {
 
                     Rectangle {
                         horizontal-stretch: 1;
-                        background: #ffffff;
+                        background: Palette.bg-color;
                         border-width: 1px;
                         border-color: #eeeeee;
                         border-radius: 6px;
@@ -122,13 +123,13 @@ export component ProfileView inherits Rectangle {
                                 text: root.followers;
                                 font-size: 16px;
                                 font-weight: 700;
-                                color: #222222;
+                                color: Palette.text-color;
                                 horizontal-alignment: center;
                             }
                             Text {
                                 text: "Seguidores";
                                 font-size: 11px;
-                                color: #666666;
+                                color: Palette.text-color;
                                 horizontal-alignment: center;
                             }
                         }
@@ -136,7 +137,7 @@ export component ProfileView inherits Rectangle {
 
                     Rectangle {
                         horizontal-stretch: 1;
-                        background: #ffffff;
+                        background: Palette.bg-color;
                         border-width: 1px;
                         border-color: #eeeeee;
                         border-radius: 6px;
@@ -148,13 +149,13 @@ export component ProfileView inherits Rectangle {
                                 text: root.following;
                                 font-size: 16px;
                                 font-weight: 700;
-                                color: #222222;
+                                color: Palette.text-color;
                                 horizontal-alignment: center;
                             }
                             Text {
                                 text: "Siguiendo";
                                 font-size: 11px;
-                                color: #666666;
+                                color: Palette.text-color;
                                 horizontal-alignment: center;
                             }
                         }
@@ -162,7 +163,7 @@ export component ProfileView inherits Rectangle {
 
                     Rectangle {
                         horizontal-stretch: 1;
-                        background: #ffffff;
+                        background: Palette.bg-color;
                         border-width: 1px;
                         border-color: #eeeeee;
                         border-radius: 6px;
@@ -174,13 +175,13 @@ export component ProfileView inherits Rectangle {
                                 text: root.stories-published;
                                 font-size: 16px;
                                 font-weight: 700;
-                                color: #222222;
+                                color: Palette.text-color;
                                 horizontal-alignment: center;
                             }
                             Text {
                                 text: "Historias";
                                 font-size: 11px;
-                                color: #666666;
+                                color: Palette.text-color;
                                 horizontal-alignment: center;
                             }
                         }

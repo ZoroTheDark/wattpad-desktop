@@ -1,3 +1,4 @@
+import { Palette } from "../palette.slint";
 // ui/views/library.slint
 import { Button, ListView, Spinner } from "std-widgets.slint";
 
@@ -10,7 +11,7 @@ export struct LibraryStoryItem {
 }
 
 export component LibraryView inherits Rectangle {
-    background: #ffffff;
+    background: Palette.bg-color;
 
     in-out property <[LibraryStoryItem]> stories: [];
     in property <bool> is-offline: false;
@@ -30,7 +31,7 @@ export component LibraryView inherits Rectangle {
                 text: "Tu Biblioteca";
                 font-size: 20px;
                 font-weight: 700;
-                color: #222222;
+                color: Palette.text-color;
             }
 
             if root.is-offline : Text {
@@ -41,27 +42,9 @@ export component LibraryView inherits Rectangle {
             }
         }
 
-        if root.is-loading : HorizontalLayout {
-            alignment: center;
-            spacing: 8px;
-
-            Spinner {
-                indeterminate: true;
-                width: 24px;
-                height: 24px;
-            }
-
-            Text {
-                text: "Cargando...";
-                font-size: 13px;
-                color: #666666;
-                vertical-alignment: center;
-            }
-        }
-
         if root.stories.length == 0 : Rectangle {
             vertical-stretch: 1;
-            background: #fafafa;
+            background: Palette.card-color;
             border-width: 1px;
             border-color: #eeeeee;
             border-radius: 8px;
@@ -75,14 +58,14 @@ export component LibraryView inherits Rectangle {
                     text: root.is-loading ? "Cargando biblioteca..." : "Tu Biblioteca (Vacía)";
                     font-size: 16px;
                     font-weight: 600;
-                    color: #222222;
+                    color: Palette.text-color;
                     horizontal-alignment: center;
                 }
 
                 Text {
                     text: "Las historias de tu biblioteca y listas de lectura aparecerán aquí.";
                     font-size: 13px;
-                    color: #666666;
+                    color: Palette.text-color;
                     horizontal-alignment: center;
                     wrap: word-wrap;
                 }
@@ -90,13 +73,14 @@ export component LibraryView inherits Rectangle {
         }
 
         if root.stories.length > 0 : ListView {
+            horizontal-stretch: 1;
             vertical-stretch: 1;
             for story in root.stories: Rectangle {
                 height: 92px;
                 border-width: 1px;
                 border-color: #eeeeee;
                 border-radius: 8px;
-                background: #fafafa;
+                background: Palette.card-color;
 
                 HorizontalLayout {
                     padding: 8px;
@@ -136,14 +120,14 @@ export component LibraryView inherits Rectangle {
                             text: story.title;
                             font-size: 14px;
                             font-weight: 600;
-                            color: #222222;
+                            color: Palette.text-color;
                             overflow: elide;
                         }
 
                         Text {
                             text: story.author;
                             font-size: 12px;
-                            color: #666666;
+                            color: Palette.text-color;
                             overflow: elide;
                         }
                     }
@@ -171,6 +155,20 @@ export component LibraryView inherits Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    if root.is-loading : Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: Palette.bg-color;
+        VerticalLayout {
+            alignment: center;
+            spacing: 10px;
+            Spinner { indeterminate: true; width: 36px; height: 36px; }
+            Text { text: "Cargando..."; color: Palette.text-color; font-size: 14px; horizontal-alignment: center; }
         }
     }
 }
