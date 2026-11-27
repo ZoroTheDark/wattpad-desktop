@@ -1,0 +1,348 @@
+// ui/app-window.slint
+import { LineEdit, Button } from "std-widgets.slint";
+import { HomeView } from "views/home.slint";
+import { SearchView } from "views/search.slint";
+import { LibraryView, LibraryStoryItem } from "views/library.slint";
+import { CreateView } from "views/create.slint";
+import { ProfileView } from "views/profile.slint";
+import { ReaderView } from "views/reader.slint";
+
+export { LibraryStoryItem }
+
+component NavTabButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> active: false;
+    callback clicked();
+
+    horizontal-stretch: 1;
+    height: 100%;
+    background: touch.has-hover ? #fff5f0 : transparent;
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 4px;
+
+        Rectangle {
+            width: 24px;
+            height: 3px;
+            border-radius: 2px;
+            background: root.active ? #ff500a : transparent;
+            x: (parent.width - self.width) / 2;
+        }
+
+        Text {
+            text: root.label;
+            font-size: 13px;
+            font-weight: root.active ? 700 : 500;
+            color: root.active ? #ff500a : #666666;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "Wattpad Desktop (Linux)";
+    preferred-width: 900px;
+    preferred-height: 720px;
+    min-width: 800px;
+    min-height: 600px;
+    background: #ffffff;
+
+    in-out property <string> username: "";
+    in-out property <string> password: "";
+    in-out property <string> search-query: "";
+    in-out property <[string]> search-results: [];
+    in-out property <[LibraryStoryItem]> home-stories: [];
+    in-out property <[LibraryStoryItem]> library-stories: [];
+    in-out property <string> draft-title: "";
+    in-out property <string> draft-content: "";
+    in-out property <string> draft-status-message: "";
+    in-out property <bool> is-logged-in: false;
+    in-out property <bool> is-loading: false;
+    in-out property <bool> is-offline: false;
+    in-out property <string> error-message: "";
+    in-out property <string> current-username: "";
+    in-out property <string> profile-full-name: "";
+    in-out property <image> profile-avatar;
+    in-out property <int> profile-followers: 0;
+    in-out property <int> profile-following: 0;
+    in-out property <int> profile-stories-count: 0;
+    in-out property <string> profile-description: "";
+    in-out property <int> current-tab: 0;
+    in-out property <bool> is_reading: false;
+    in-out property <string> reader-story-title: "";
+    in-out property <string> reader-chapter-title: "";
+    in-out property <int> reader-chapter-index: 0;
+    in-out property <int> reader-total-chapters: 0;
+
+    callback login-requested(string, string);
+    callback search-requested(string);
+    callback logout-requested();
+    callback tab-selected(int);
+    callback home-story-clicked(string);
+    callback save-draft-requested(string, string);
+    callback download-story-requested(string);
+    callback read-story-requested(string);
+    callback close-reader-requested();
+    callback prev-chapter-requested();
+    callback next-chapter-requested();
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // Barra superior estilo Wattpad
+        Rectangle {
+            height: 52px;
+            background: #ffffff;
+            border-width: 1px;
+            border-color: #eeeeee;
+
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 12px;
+                alignment: space-between;
+
+                Text {
+                    text: "Wattpad";
+                    color: #ff500a;
+                    font-size: 22px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                if root.is-logged-in : Text {
+                    text: root.is-offline ? "Sin conexión" : (root.current-username != "" ? "@" + root.current-username : "Conectado");
+                    color: root.is-offline ? #ff500a : #666666;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // Vista de Login si no hay sesión activa
+        if !root.is-logged-in : VerticalLayout {
+            vertical-stretch: 1;
+            padding: 24px;
+            alignment: center;
+            spacing: 12px;
+
+            Text {
+                text: "Inicia sesión en Wattpad";
+                font-size: 20px;
+                font-weight: 700;
+                color: #222222;
+            }
+
+            Text {
+                text: "Usa tu nombre de usuario o correo electrónico y tu contraseña.";
+                font-size: 13px;
+                color: #666666;
+                wrap: word-wrap;
+            }
+
+            LineEdit {
+                placeholder-text: "Usuario o correo electrónico";
+                text <=> root.username;
+                enabled: !root.is-loading;
+            }
+
+            LineEdit {
+                placeholder-text: "Contraseña";
+                input-type: InputType.password;
+                text <=> root.password;
+                enabled: !root.is-loading;
+                accepted => {
+                    if !root.is-loading {
+                        root.login-requested(root.username, root.password);
+                    }
+                }
+            }
+
+            if root.error-message != "" : Rectangle {
+                background: #fff0ed;
+                border-width: 1px;
+                border-color: #f5b5a8;
+                border-radius: 6px;
+
+                HorizontalLayout {
+                    padding: 10px;
+                    Text {
+                        text: root.error-message;
+                        color: #b42318;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            Button {
+                text: root.is-loading ? "Iniciando sesión..." : "Iniciar Sesión";
+                primary: true;
+                enabled: !root.is-loading;
+                clicked => {
+                    root.login-requested(root.username, root.password);
+                }
+            }
+        }
+
+        // Shell móvil adaptado a escritorio cuando hay sesión activa
+        if root.is-logged-in : VerticalLayout {
+            vertical-stretch: 1;
+            padding: 0px;
+            spacing: 0px;
+
+            // Área de contenido central
+            Rectangle {
+                vertical-stretch: 1;
+                background: #ffffff;
+
+                if root.current-tab == 0 : HomeView {
+                    width: 100%;
+                    height: 100%;
+                    stories <=> root.home-stories;
+                    is-loading: root.is-loading;
+                    is-offline: root.is-offline;
+                    story-clicked(story-id) => {
+                        root.home-story-clicked(story-id);
+                    }
+                }
+
+                if root.current-tab == 1 : SearchView {
+                    width: 100%;
+                    height: 100%;
+                    search-query <=> root.search-query;
+                    search-results: root.search-results;
+                    is-loading <=> root.is-loading;
+                    error-message: root.error-message;
+                    search-requested(query) => {
+                        root.search-requested(query);
+                    }
+                }
+
+                if root.current-tab == 2 : LibraryView {
+                    width: 100%;
+                    height: 100%;
+                    stories <=> root.library-stories;
+                    is-offline: root.is-offline;
+                    is-loading <=> root.is-loading;
+                    download-requested(story-id) => {
+                        root.download-story-requested(story-id);
+                    }
+                    read-requested(story-id) => {
+                        root.read-story-requested(story-id);
+                    }
+                }
+
+                if root.current-tab == 3 : CreateView {
+                    width: 100%;
+                    height: 100%;
+                    story-title <=> root.draft-title;
+                    story-content <=> root.draft-content;
+                    status-message: root.draft-status-message;
+                    is-saving: root.is-loading;
+                    save-draft-requested(title, content) => {
+                        root.save-draft-requested(title, content);
+                    }
+                }
+
+                if root.current-tab == 4 : ProfileView {
+                    width: 100%;
+                    height: 100%;
+                    username <=> root.current-username;
+                    full-name <=> root.profile-full-name;
+                    avatar <=> root.profile-avatar;
+                    followers <=> root.profile-followers;
+                    following <=> root.profile-following;
+                    stories-published <=> root.profile-stories-count;
+                    description <=> root.profile-description;
+                    is-loading: root.is-loading;
+                    is-offline: root.is-offline;
+                    logout-requested => {
+                        root.logout-requested();
+                    }
+                }
+            }
+
+            // Barra de navegación inferior (Bottom Navigation Bar)
+            Rectangle {
+                height: 60px;
+                background: #ffffff;
+                border-width: 1px;
+                border-color: #eeeeee;
+
+                HorizontalLayout {
+                    padding: 0px;
+                    spacing: 0px;
+
+                    NavTabButton {
+                        label: "Inicio";
+                        active: root.current-tab == 0;
+                        clicked => {
+                            root.tab-selected(0);
+                        }
+                    }
+
+                    NavTabButton {
+                        label: "Buscar";
+                        active: root.current-tab == 1;
+                        clicked => {
+                            root.tab-selected(1);
+                        }
+                    }
+
+                    NavTabButton {
+                        label: "Biblioteca";
+                        active: root.current-tab == 2;
+                        clicked => {
+                            root.tab-selected(2);
+                        }
+                    }
+
+                    NavTabButton {
+                        label: "Crear";
+                        active: root.current-tab == 3;
+                        clicked => {
+                            root.tab-selected(3);
+                        }
+                    }
+
+                    NavTabButton {
+                        label: "Perfil";
+                        active: root.current-tab == 4;
+                        clicked => {
+                            root.tab-selected(4);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Superposición del lector web
+    if root.is_reading : ReaderView {
+        width: 100%;
+        height: 100%;
+        story-title: root.reader-story-title;
+        chapter-title: root.reader-chapter-title;
+        current-chapter-index: root.reader-chapter-index;
+        total-chapters: root.reader-total-chapters;
+        close-requested => {
+            root.close-reader-requested();
+        }
+        prev-chapter-requested => {
+            root.prev-chapter-requested();
+        }
+        next-chapter-requested => {
+            root.next-chapter-requested();
+        }
+    }
+}

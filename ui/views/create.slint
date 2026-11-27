@@ -1,0 +1,87 @@
+// ui/views/create.slint
+import { LineEdit, TextEdit, Button } from "std-widgets.slint";
+
+export component CreateView inherits Rectangle {
+    background: #ffffff;
+
+    in-out property <string> story-title: "";
+    in-out property <string> story-content: "";
+    in property <string> status-message: "";
+    in property <bool> is-saving: false;
+
+    callback save-draft-requested(string, string);
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        Text {
+            text: "Crear Historia";
+            font-size: 20px;
+            font-weight: 700;
+            color: #222222;
+        }
+
+        VerticalLayout {
+            spacing: 4px;
+
+            Text {
+                text: "Título de la historia";
+                font-size: 13px;
+                font-weight: 600;
+                color: #444444;
+            }
+
+            LineEdit {
+                placeholder-text: "Escribe el título de tu historia...";
+                text <=> root.story-title;
+                enabled: !root.is-saving;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 4px;
+            vertical-stretch: 1;
+
+            Text {
+                text: "Contenido";
+                font-size: 13px;
+                font-weight: 600;
+                color: #444444;
+            }
+
+            TextEdit {
+                vertical-stretch: 1;
+                text <=> root.story-content;
+                enabled: !root.is-saving;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.status-message != "" : Rectangle {
+            background: #f0f9f4;
+            border-width: 1px;
+            border-color: #a6e3be;
+            border-radius: 6px;
+
+            HorizontalLayout {
+                padding: 10px;
+                Text {
+                    text: root.status-message;
+                    color: #1b5e20;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        Button {
+            text: root.is-saving ? "Guardando..." : "Guardar Borrador";
+            primary: true;
+            enabled: !root.is-saving;
+            clicked => {
+                root.save-draft-requested(root.story-title, root.story-content);
+            }
+        }
+    }
+}

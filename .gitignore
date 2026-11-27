@@ -1,0 +1,16 @@
+/# Rust
+/target/
+**/*.rs.bk
+
+# Datos personales y sesiones
+wattpad_sesion.json
+wattpad.db
+*.db
+
+# Archivos descargados y cifrados
+*.epub.enc
+*.enc
+borrador_historia.txt
+
+# Archivos del sistema
+.DS_Storetarget

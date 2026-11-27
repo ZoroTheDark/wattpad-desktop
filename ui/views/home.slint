@@ -1,0 +1,142 @@
+// ui/views/home.slint
+import { ListView } from "std-widgets.slint";
+import { LibraryStoryItem } from "library.slint";
+
+export component HomeView inherits Rectangle {
+    background: #ffffff;
+
+    in-out property <[LibraryStoryItem]> stories: [];
+    in property <bool> is-loading: false;
+    in property <bool> is-offline: false;
+
+    callback story-clicked(string);
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        HorizontalLayout {
+            alignment: space-between;
+
+            Text {
+                text: "Inicio - Destacados";
+                font-size: 20px;
+                font-weight: 700;
+                color: #222222;
+            }
+
+            if root.is-offline : Text {
+                text: "Modo sin conexión";
+                font-size: 12px;
+                color: #ff500a;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.stories.length == 0 : Rectangle {
+            vertical-stretch: 1;
+            background: #fafafa;
+            border-width: 1px;
+            border-color: #eeeeee;
+            border-radius: 8px;
+
+            VerticalLayout {
+                alignment: center;
+                padding: 20px;
+                spacing: 6px;
+
+                Text {
+                    text: root.is-loading ? "Cargando destacados..." : "Descubre nuevas historias";
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #222222;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: "Las historias recomendadas y populares aparecerán aquí.";
+                    font-size: 13px;
+                    color: #666666;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        if root.stories.length > 0 : ListView {
+            vertical-stretch: 1;
+            for story in root.stories: Rectangle {
+                height: 92px;
+                border-width: 1px;
+                border-color: touch.has-hover ? #ff500a : #eeeeee;
+                border-radius: 8px;
+                background: touch.has-hover ? #fff8f5 : #fafafa;
+
+                touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.story-clicked(story.id);
+                    }
+                }
+
+                HorizontalLayout {
+                    padding: 8px;
+                    spacing: 10px;
+
+                    Rectangle {
+                        width: 48px;
+                        height: 74px;
+                        border-radius: 4px;
+                        background: #ffe8df;
+                        clip: true;
+
+                        if story.cover.width > 0 : Image {
+                            width: 100%;
+                            height: 100%;
+                            source: story.cover;
+                            image-fit: cover;
+                        }
+
+                        if story.cover.width == 0 : Text {
+                            text: "WP";
+                            color: #ff500a;
+                            font-size: 12px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        horizontal-stretch: 1;
+
+                        Text {
+                            text: story.title;
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: #222222;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            text: story.author;
+                            font-size: 12px;
+                            color: #666666;
+                            overflow: elide;
+                        }
+                    }
+
+                    Text {
+                        text: story.is_downloaded ? "Offline ›" : "Leer ›";
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: #ff500a;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,107 @@
+// ui/views/search.slint
+import { LineEdit, Button, ListView, Spinner } from "std-widgets.slint";
+
+export component SearchView inherits Rectangle {
+    background: #ffffff;
+
+    in-out property <string> search-query: "";
+    in property <[string]> search-results: [];
+    in-out property <bool> is-loading: false;
+    in property <string> error-message: "";
+
+    callback search-requested(string);
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        Text {
+            text: "Buscar";
+            font-size: 20px;
+            font-weight: 700;
+            color: #222222;
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+
+            LineEdit {
+                placeholder-text: "Buscar historias en Wattpad...";
+                text <=> root.search-query;
+                enabled: !root.is-loading;
+                horizontal-stretch: 1;
+                accepted => {
+                    if !root.is-loading {
+                        root.search-requested(root.search-query);
+                    }
+                }
+            }
+
+            Button {
+                text: root.is-loading ? "Buscando..." : "Buscar";
+                primary: true;
+                enabled: !root.is-loading;
+                clicked => {
+                    root.search-requested(root.search-query);
+                }
+            }
+        }
+
+        if root.is-loading : HorizontalLayout {
+            alignment: center;
+            spacing: 8px;
+
+            Spinner {
+                indeterminate: true;
+                width: 24px;
+                height: 24px;
+            }
+
+            Text {
+                text: "Cargando...";
+                font-size: 13px;
+                color: #666666;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.error-message != "" : Rectangle {
+            background: #fff0ed;
+            border-width: 1px;
+            border-color: #f5b5a8;
+            border-radius: 6px;
+
+            HorizontalLayout {
+                padding: 10px;
+                Text {
+                    text: root.error-message;
+                    color: #b42318;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        ListView {
+            vertical-stretch: 1;
+            for result in root.search-results: Rectangle {
+                height: 44px;
+                border-width: 1px;
+                border-color: #f0f0f0;
+                border-radius: 6px;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    Text {
+                        text: result;
+                        font-size: 14px;
+                        color: #222222;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+    }
+}
