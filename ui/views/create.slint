@@ -60,16 +60,16 @@ export component CreateView inherits Rectangle {
         }
 
         if root.status-message != "" : Rectangle {
-            background: #f0f9f4;
+            background: Palette.card-color;
             border-width: 1px;
-            border-color: #a6e3be;
+            border-color: #eeeeee;
             border-radius: 6px;
 
             HorizontalLayout {
                 padding: 10px;
                 Text {
                     text: root.status-message;
-                    color: #1b5e20;
+                    color: Palette.text-color;
                     font-size: 13px;
                     wrap: word-wrap;
                 }

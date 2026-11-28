@@ -29,7 +29,7 @@ export component HomeView inherits Rectangle {
             if root.is-offline : Text {
                 text: "Modo sin conexión";
                 font-size: 12px;
-                color: #ff500a;
+                color: Palette.text-color;
                 vertical-alignment: center;
             }
         }
@@ -89,7 +89,7 @@ export component HomeView inherits Rectangle {
                         width: 48px;
                         height: 74px;
                         border-radius: 4px;
-                        background: #ffe8df;
+                        background: Palette.card-color;
                         clip: true;
 
                         if story.cover.width > 0 : Image {
@@ -101,7 +101,7 @@ export component HomeView inherits Rectangle {
 
                         if story.cover.width == 0 : Text {
                             text: "WP";
-                            color: #ff500a;
+                            color: Palette.text-color;
                             font-size: 12px;
                             font-weight: 700;
                             horizontal-alignment: center;
@@ -134,7 +134,7 @@ export component HomeView inherits Rectangle {
                         text: story.is_downloaded ? "Offline ›" : "Leer ›";
                         font-size: 12px;
                         font-weight: 600;
-                        color: #ff500a;
+                        color: Palette.text-color;
                         vertical-alignment: center;
                     }
                 }

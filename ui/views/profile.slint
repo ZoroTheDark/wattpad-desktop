@@ -48,9 +48,9 @@ export component ProfileView inherits Rectangle {
                         width: 68px;
                         height: 68px;
                         border-radius: 34px;
-                        background: #ffe8df;
+                        background: Palette.card-color;
                         border-width: 2px;
-                        border-color: #ff500a;
+                        border-color: #eeeeee;
                         clip: true;
 
                         if root.avatar.width > 0 : Image {
@@ -62,7 +62,7 @@ export component ProfileView inherits Rectangle {
 
                         if root.avatar.width == 0 : Text {
                             text: "WP";
-                            color: #ff500a;
+                            color: Palette.text-color;
                             font-size: 20px;
                             font-weight: 700;
                             horizontal-alignment: center;
@@ -93,7 +93,7 @@ export component ProfileView inherits Rectangle {
                         Text {
                             text: root.is-offline ? "Estado: Sin conexión" : "Estado: Conectado";
                             font-size: 12px;
-                            color: root.is-offline ? #ff500a : #2e7d32;
+                            color: Palette.text-color;
                         }
                     }
                 }

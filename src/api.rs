@@ -45,6 +45,125 @@ pub struct SearchStory {
     pub description: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct Chapter {
+    pub id: String,
+    pub title: String,
+    pub index: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct StoryDetails {
+    pub id: String,
+    pub title: String,
+    pub author: String,
+    pub cover_url: String,
+    pub description: String,
+    pub chapters: Vec<Chapter>,
+}
+
+pub async fn obtener_detalles_historia(
+    client: &WattpadClient,
+    story_id: &str,
+) -> Result<StoryDetails, String> {
+    if let Some(story) = historias_destacadas_simuladas()
+        .into_iter()
+        .find(|story| story.id == story_id)
+    {
+        return Ok(StoryDetails {
+            id: story.id.clone(),
+            title: story.title,
+            author: story.author,
+            cover_url: story.cover_url,
+            description: "Historia destacada disponible como vista previa local.".into(),
+            chapters: vec![Chapter {
+                id: format!("{}-cap-1", story.id),
+                title: "Capítulo 1".into(),
+                index: 0,
+            }],
+        });
+    }
+
+    let _ = client;
+    let http = obtener_http_client();
+    let url = format!("https://www.wattpad.com/api/v3/stories/{}", story_id);
+    let response = http
+        .get(url)
+        .query(&[(
+            "fields",
+            "id,title,description,cover,user(name,fullname),parts(id,title)",
+        )])
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("Error de red al obtener detalles de la historia: {e}"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Error al leer los detalles: {e}"))?;
+    if !status.is_success() {
+        return Err(sesion::parsear_error_wattpad(status.as_u16(), &body));
+    }
+    let value: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| format!("Respuesta inválida al obtener detalles: {e}"))?;
+    let value_string = |v: &serde_json::Value| {
+        v.as_str()
+            .map(str::to_owned)
+            .or_else(|| v.as_u64().map(|n| n.to_string()))
+    };
+    let user = value.get("user").and_then(serde_json::Value::as_object);
+    let author = user
+        .and_then(|u| u.get("fullname").or_else(|| u.get("name")))
+        .and_then(serde_json::Value::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Autor desconocido")
+        .to_owned();
+    let chapters = value
+        .get("parts")
+        .and_then(serde_json::Value::as_array)
+        .map(|parts| {
+            parts
+                .iter()
+                .enumerate()
+                .filter_map(|(index, part)| {
+                    let id = value_string(part.get("id")?)?;
+                    let title = part
+                        .get("title")
+                        .and_then(serde_json::Value::as_str)
+                        .filter(|title| !title.trim().is_empty())
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| format!("Capítulo {}", index + 1));
+                    Some(Chapter { id, title, index })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(StoryDetails {
+        id: value
+            .get("id")
+            .and_then(value_string)
+            .unwrap_or_else(|| story_id.to_owned()),
+        title: value
+            .get("title")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("Historia sin título")
+            .to_owned(),
+        author,
+        cover_url: value
+            .get("cover")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        description: value
+            .get("description")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        chapters,
+    })
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UserProfileApiResponse {
@@ -117,9 +236,7 @@ struct SearchStoryAuthor {
 /// Construye un `WattpadClient` de `wp-mini` usando el `reqwest::Client` con cookies compartidas.
 pub fn crear_wattpad_client(http_client: reqwest::Client) -> WattpadClient {
     let _ = SHARED_HTTP_CLIENT.set(http_client.clone());
-    WattpadClient::builder()
-        .reqwest_client(http_client)
-        .build()
+    WattpadClient::builder().reqwest_client(http_client).build()
 }
 
 fn obtener_http_client() -> &'static reqwest::Client {
@@ -165,9 +282,18 @@ pub async fn buscar_historias(
         .collect();
 
     match opciones.get("length").copied().unwrap_or("0") {
-        "1" => params.extend([("minParts".into(), "1".into()), ("maxParts".into(), "10".into())]),
-        "2" => params.extend([("minParts".into(), "10".into()), ("maxParts".into(), "20".into())]),
-        "3" => params.extend([("minParts".into(), "20".into()), ("maxParts".into(), "50".into())]),
+        "1" => params.extend([
+            ("minParts".into(), "1".into()),
+            ("maxParts".into(), "10".into()),
+        ]),
+        "2" => params.extend([
+            ("minParts".into(), "10".into()),
+            ("maxParts".into(), "20".into()),
+        ]),
+        "3" => params.extend([
+            ("minParts".into(), "20".into()),
+            ("maxParts".into(), "50".into()),
+        ]),
         "4" => params.push(("minParts".into(), "50".into())),
         _ => {}
     }
@@ -196,7 +322,11 @@ pub async fn buscar_historias(
         // TODO: Confirmar el parámetro de Wattpad para excluir historias gratuitas.
         params.push(("paid".into(), "true".into()));
     }
-    if let Some(tags) = opciones.get("tags").map(|tags| tags.trim()).filter(|tags| !tags.is_empty()) {
+    if let Some(tags) = opciones
+        .get("tags")
+        .map(|tags| tags.trim())
+        .filter(|tags| !tags.is_empty())
+    {
         // TODO: Confirmar si Wattpad admite un parámetro tags independiente en esta ruta.
         params.push(("tags".into(), tags.to_string()));
     }
@@ -293,7 +423,9 @@ pub async fn obtener_capitulos_historia(
         .await
         .map_err(|e| format!("Error al obtener historia {}: {}", story_id, e))?;
 
-    let title = story.title.unwrap_or_else(|| format!("Historia {}", story_id));
+    let title = story
+        .title
+        .unwrap_or_else(|| format!("Historia {}", story_id));
     let parts = story.num_parts.unwrap_or(0);
     Ok((title, parts))
 }
@@ -329,10 +461,7 @@ pub async fn obtener_perfil(client: &WattpadClient) -> Result<UserProfile, Strin
     let parsed: UserProfileApiResponse = serde_json::from_str(&body)
         .map_err(|e| format!("Error al procesar perfil de Wattpad: {}", e))?;
 
-    let username = parsed
-        .username
-        .or(parsed.name)
-        .unwrap_or_default();
+    let username = parsed.username.or(parsed.name).unwrap_or_default();
 
     Ok(UserProfile {
         full_name: parsed.full_name.unwrap_or_else(|| username.clone()),
@@ -450,10 +579,7 @@ pub async fn obtener_biblioteca(client: &WattpadClient) -> Result<Vec<LibrarySto
         .get("https://www.wattpad.com/api/v3/library")
         .query(&[
             ("limit", "30"),
-            (
-                "fields",
-                "stories(id,title,cover,user(name,fullname))",
-            ),
+            ("fields", "stories(id,title,cover,user(name,fullname))"),
         ])
         .header("Accept", "application/json")
         .send()
@@ -520,7 +646,13 @@ pub async fn descargar_imagen_cache(url: &str, clave: &str) -> Option<PathBuf> {
 
     let safe_key: String = clave
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let ruta = ruta_cache_imagen(&format!("{}.img", safe_key));
     if ruta.exists() {
@@ -635,8 +767,13 @@ pub fn leer_epub_desencriptado(
     password: &str,
 ) -> Result<EpubData, String> {
     let ruta = ruta_epub(story_id);
-    let bytes = std::fs::read(&ruta)
-        .map_err(|e| format!("No se pudo leer el archivo EPUB '{}': {}", ruta.display(), e))?;
+    let bytes = std::fs::read(&ruta).map_err(|e| {
+        format!(
+            "No se pudo leer el archivo EPUB '{}': {}",
+            ruta.display(),
+            e
+        )
+    })?;
 
     let header_len = crypto::SALT_LEN + crypto::NONCE_LEN;
     if bytes.len() <= header_len {
@@ -677,7 +814,12 @@ async fn obtener_historia_y_capitulos_api(
         .story
         .get_story_info(story_id_num, Some(&fields))
         .await
-        .map_err(|e| format!("Error al obtener detalles de la historia {}: {}", story_id, e))?;
+        .map_err(|e| {
+            format!(
+                "Error al obtener detalles de la historia {}: {}",
+                story_id, e
+            )
+        })?;
 
     let title = story
         .title
@@ -807,10 +949,7 @@ mod tests {
 
     #[test]
     fn guarda_y_lee_epub_encriptado_con_salt_y_nonce() {
-        let dir = std::env::temp_dir().join(format!(
-            "wattpad_epub_test_{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("wattpad_epub_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::env::set_var("XDG_DATA_HOME", &dir);
 

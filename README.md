@@ -14,7 +14,7 @@ Cliente de escritorio no oficial de Wattpad para Linux, construido con **Rust** 
 - **Descargas cifradas localmente:** Los capítulos descargados para lectura offline se serializan y cifran localmente con **ChaCha20-Poly1305** y clave derivada por SHA-256 (`username`, `password` y `salt`).
 - **Historial de lectura (Seguir leyendo):** Registro persistente del último capítulo leído por historia en SQLite (`wattpad.db`, tabla `progress`), retomando automáticamente la lectura donde la dejaste.
 - **Notificaciones en segundo plano:** Comprobación periódica de cambios en votos, capítulos o historias seguidas mediante `notify-rust`.
-- **Borrador local:** Pestaña *Crear* para redactar y guardar borradores locales en `borrador_historia.txt`.
+- **Borrador local:** Pestaña _Crear_ para redactar y guardar borradores locales en `borrador_historia.txt`.
 
 ---
 
@@ -33,7 +33,7 @@ Cliente de escritorio no oficial de Wattpad para Linux, construido con **Rust** 
 ## ⚠️ ADVERTENCIA IMPORTANTE (Disclaimer)
 
 - **API no oficial:** Wattpad **no** dispone de una API pública oficial para clientes de terceros. Este proyecto interactúa con endpoints internos y no documentados (a través de `wp-mini` y peticiones HTTP directas), lo que significa que **la aplicación puede dejar de funcionar total o parcialmente en cualquier momento** si Wattpad cambia sus rutas, respuestas o mecanismos de autenticación.
-- **Descargas cifradas y DRM casero:** Las historias descargadas para lectura sin conexión se guardan cifradas localmente en disco (un mecanismo tipo *DRM casero* basado en ChaCha20-Poly1305) con el objetivo de evitar la distribución directa de obras en texto plano o EPUB sin protección. Aun así, **el código fuente del proyecto es abierto**, por lo que este cifrado es una medida disuasoria local y no una protección criptográfica invulnerable frente a quien tenga acceso al entorno de ejecución.
+- **Descargas cifradas y DRM casero:** Las historias descargadas para lectura sin conexión se guardan cifradas localmente en disco (un mecanismo tipo _DRM casero_ basado en ChaCha20-Poly1305) con el objetivo de evitar la distribución directa de obras en texto plano o EPUB sin protección. Aun así, **el código fuente del proyecto es abierto**, por lo que este cifrado es una medida disuasoria local y no una protección criptográfica invulnerable frente a quien tenga acceso al entorno de ejecución.
 - **Uso bajo tu propia responsabilidad:** Este software es un proyecto independiente, sin afiliación, respaldo ni relación oficial con Wattpad. Respeta los términos de servicio de la plataforma y los derechos de autor de los escritores.
 
 ---
@@ -58,7 +58,7 @@ sudo pacman -S --needed rustup base-devel pkgconf openssl gtk3 webkit2gtk-4.1
 sudo apt update && sudo apt install -y build-essential pkg-config libssl-dev libgtk-3-dev libwebkit2gtk-4.1-dev
 ```
 
-*(Además requiere un servidor gráfico X11 o Wayland para Slint y la ventana WebView, y un daemon de notificaciones D-Bus si deseas recibir notificaciones de escritorio.)*
+_(Además requiere un servidor gráfico X11 o Wayland para Slint y la ventana WebView, y un daemon de notificaciones D-Bus si deseas recibir notificaciones de escritorio.)_
 
 ---
 
@@ -67,17 +67,17 @@ sudo apt update && sudo apt install -y build-essential pkg-config libssl-dev lib
 1. Clona el repositorio y entra al directorio del proyecto:
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/ZoroTheDark/wattpad-desktop.git
 cd wattpad
 ```
 
-2. Compila en modo release:
+1. Compila en modo release:
 
 ```bash
 cargo build --release
 ```
 
-3. Ejecuta el binario compilado:
+1. Ejecuta el binario compilado:
 
 ```bash
 ./target/release/mi-cliente-wattpad
@@ -95,10 +95,10 @@ cargo test
 
 Las contribuciones son bienvenidas, especialmente para mantener la compatibilidad con cambios en Wattpad, mejorar la interfaz en Slint o pulir el lector WebView:
 
-1. Haz un *fork* del repositorio.
+1. Haz un _fork_ del repositorio.
 2. Crea una rama descriptiva para tu cambio (`git checkout -b feat/mi-mejora`).
 3. Asegúrate de que el código compile y pase las pruebas (`cargo check && cargo test`).
-4. Abre un *Pull Request* explicando claramente el problema resuelto o la mejora añadida.
+4. Abre un _Pull Request_ explicando claramente el problema resuelto o la mejora añadida.
 
 ---
 

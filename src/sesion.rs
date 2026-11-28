@@ -61,12 +61,7 @@ fn ruta_sesion() -> PathBuf {
 }
 
 /// Devuelve `(wp_client, reqwest_client, cookie_store, tiene_token_en_disco)`.
-pub fn cargar_cliente() -> (
-    WattpadClient,
-    reqwest::Client,
-    Arc<CookieStoreMutex>,
-    bool,
-) {
+pub fn cargar_cliente() -> (WattpadClient, reqwest::Client, Arc<CookieStoreMutex>, bool) {
     let ruta = ruta_sesion();
     let cookie_store = if let Ok(file) = std::fs::File::open(&ruta) {
         let reader = std::io::BufReader::new(file);
@@ -186,8 +181,8 @@ pub async fn iniciar_sesion(
 
     // Guardamos el token como cookie persistente en .wattpad.com para todos los endpoints web/v3/apiv2.
     {
-        let wp_url = reqwest::Url::parse("https://www.wattpad.com/")
-            .expect("URL base de Wattpad válida");
+        let wp_url =
+            reqwest::Url::parse("https://www.wattpad.com/").expect("URL base de Wattpad válida");
         let cookie_header = format!(
             "token={}; Domain=.wattpad.com; Path=/; Max-Age=2592000; Secure; HttpOnly",
             token
@@ -239,10 +234,7 @@ pub async fn verificar_sesion(http: &reqwest::Client) -> Result<String, String> 
 }
 
 /// Cierra la sesión actual, limpia las cookies y elimina el archivo guardado.
-pub async fn cerrar_sesion(
-    http: &reqwest::Client,
-    cookie_store_arc: &Arc<CookieStoreMutex>,
-) {
+pub async fn cerrar_sesion(http: &reqwest::Client, cookie_store_arc: &Arc<CookieStoreMutex>) {
     let _ = http.get("https://www.wattpad.com/logout").send().await;
     {
         let mut store = cookie_store_arc.lock().unwrap();
@@ -257,7 +249,9 @@ pub(crate) fn parsear_error_wattpad(status: u16, body: &str) -> String {
             Some(1029) => "Usuario o contraseña incorrectos (código 1029).".to_string(),
             Some(1018) => "La sesión expiró o no has iniciado sesión (código 1018).".to_string(),
             Some(code) => {
-                let msg = err.message.unwrap_or_else(|| "Error de Wattpad".to_string());
+                let msg = err
+                    .message
+                    .unwrap_or_else(|| "Error de Wattpad".to_string());
                 format!("{} (código {})", msg, code)
             }
             None => err
@@ -283,7 +277,8 @@ mod tests {
 
     #[test]
     fn parsea_respuesta_de_sesion() {
-        let session_raw = r#"{"token":"abc123","user":{"username":"lector_linux","name":"Lector"}}"#;
+        let session_raw =
+            r#"{"token":"abc123","user":{"username":"lector_linux","name":"Lector"}}"#;
         let session: SessionApiResponse = serde_json::from_str(session_raw).unwrap();
         assert_eq!(session.token.as_deref(), Some("abc123"));
         assert_eq!(

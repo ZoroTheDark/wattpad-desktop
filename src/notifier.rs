@@ -72,11 +72,7 @@ fn evaluar_incremento(anterior: Option<u64>, actual: u64) -> bool {
 }
 
 fn enviar_notificacion(cuerpo: &str) {
-    if let Err(e) = Notification::new()
-        .summary("Wattpad")
-        .body(cuerpo)
-        .show()
-    {
+    if let Err(e) = Notification::new().summary("Wattpad").body(cuerpo).show() {
         eprintln!("No se pudo mostrar la notificación: {}", e);
     }
 }
@@ -122,7 +118,9 @@ async fn verificar_cambios(client: &WattpadClient, ruta_estado: &Path) {
                     enviar_notificacion(&format!("¡Nuevo capítulo en {}!", title));
                 }
                 if anterior != Some(capitulos_actuales) {
-                    estado.capitulos_por_historia.insert(key, capitulos_actuales);
+                    estado
+                        .capitulos_por_historia
+                        .insert(key, capitulos_actuales);
                     modificado = true;
                 }
             }

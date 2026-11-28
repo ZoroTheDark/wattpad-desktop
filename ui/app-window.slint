@@ -7,10 +7,14 @@ import { LibraryView, LibraryStoryItem } from "views/library.slint";
 import { CreateView } from "views/create.slint";
 import { ProfileView } from "views/profile.slint";
 import { ReaderView } from "views/reader.slint";
+import { StoryDetailsView, ChapterData, StoryDetailsData } from "views/story_details.slint";
 import { Palette } from "palette.slint";
+import { NotificationsView } from "views/notifications.slint";
 
 export { LibraryStoryItem }
 export { SearchStoryItem }
+export { ChapterData }
+export { StoryDetailsData }
 export { Palette }
 
 component NavItem inherits Rectangle {
@@ -25,7 +29,7 @@ component NavItem inherits Rectangle {
 
     horizontal-stretch: 1;
     height: 100%;
-    background: touch.has-hover ? (root.is-dark ? #333333 : #fff5f0) : transparent;
+    background: touch.has-hover ? Palette.card-color : transparent;
 
     touch := TouchArea {
         mouse-cursor: pointer;
@@ -65,11 +69,12 @@ component NavItem inherits Rectangle {
                 text: root.label;
                 font-size: 13px;
                 font-weight: root.is-active ? 700 : 500;
-                color: root.is-active ? #ff500a : (root.is-dark ? #ffffff : #666666);
+                color: Palette.text-color;
                 vertical-alignment: center;
             }
         }
     }
+
 }
 
 export component AppWindow inherits Window {
@@ -107,6 +112,9 @@ export component AppWindow inherits Window {
     in-out property <string> reader-chapter-title: "";
     in-out property <int> reader-chapter-index: 0;
     in-out property <int> reader-total-chapters: 0;
+    in-out property <bool> show-details: false;
+    in-out property <StoryDetailsData> current-story;
+    in-out property <[ChapterData]> detail-chapters: [];
 
     callback login-requested(string, string);
     callback search-requested(string, string);
@@ -114,6 +122,9 @@ export component AppWindow inherits Window {
     callback tab-selected(int);
     callback home-story-clicked(string);
     callback search-story-clicked(string);
+    callback chapter-clicked(int);
+    callback details-back-clicked();
+    callback open-notifications();
     callback save-draft-requested(string, string);
     callback download-story-requested(string);
     callback read-story-requested(string);
@@ -128,7 +139,7 @@ export component AppWindow inherits Window {
         // Barra superior estilo Wattpad
         Rectangle {
             height: 52px;
-            background: root.is-dark-mode ? #202124 : #ffffff;
+            background: Palette.bg-color;
             border-width: 1px;
             border-color: #eeeeee;
 
@@ -140,7 +151,7 @@ export component AppWindow inherits Window {
 
                 Text {
                     text: "Wattpad";
-                    color: #ff500a;
+                    color: Palette.text-color;
                     font-size: 22px;
                     font-weight: 700;
                     vertical-alignment: center;
@@ -150,7 +161,7 @@ export component AppWindow inherits Window {
                     spacing: 10px;
                     if root.is-logged-in : Text {
                         text: root.is-offline ? "Sin conexión" : (root.current-username != "" ? "@" + root.current-username : "Conectado");
-                        color: root.is-offline ? #ff500a : (root.is-dark-mode ? #ffffff : #666666);
+                        color: Palette.text-color;
                         font-size: 13px;
                         vertical-alignment: center;
                     }
@@ -205,16 +216,16 @@ export component AppWindow inherits Window {
             }
 
             if root.error-message != "" : Rectangle {
-                background: #fff0ed;
+                background: Palette.card-color;
                 border-width: 1px;
-                border-color: #f5b5a8;
+                border-color: #eeeeee;
                 border-radius: 6px;
 
                 HorizontalLayout {
                     padding: 10px;
                     Text {
                         text: root.error-message;
-                        color: #b42318;
+                        color: Palette.text-color;
                         font-size: 13px;
                         wrap: word-wrap;
                     }
@@ -242,7 +253,16 @@ export component AppWindow inherits Window {
                 vertical-stretch: 1;
                 background: Palette.bg-color;
 
-                if root.current-tab == 0 : HomeView {
+                if root.show-details : StoryDetailsView {
+                    width: 100%;
+                    height: 100%;
+                    story: root.current-story;
+                    chapters <=> root.detail-chapters;
+                    chapter-clicked(index) => { root.chapter-clicked(index); }
+                    back-clicked => { root.details-back-clicked(); }
+                }
+
+                if !root.show-details && root.current-tab == 0 : HomeView {
                     width: 100%;
                     height: 100%;
                     stories <=> root.home-stories;
@@ -253,7 +273,7 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                if root.current-tab == 1 : SearchView {
+                if !root.show-details && root.current-tab == 1 : SearchView {
                     width: 100%;
                     height: 100%;
                     search-query <=> root.search-query;
@@ -268,7 +288,7 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                if root.current-tab == 2 : LibraryView {
+                if !root.show-details && root.current-tab == 2 : LibraryView {
                     width: 100%;
                     height: 100%;
                     stories <=> root.library-stories;
@@ -282,7 +302,7 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                if root.current-tab == 3 : CreateView {
+                if !root.show-details && root.current-tab == 3 : CreateView {
                     width: 100%;
                     height: 100%;
                     story-title <=> root.draft-title;
@@ -294,7 +314,7 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                if root.current-tab == 4 : ProfileView {
+                if !root.show-details && root.current-tab == 4 : ProfileView {
                     width: 100%;
                     height: 100%;
                     username <=> root.current-username;
@@ -310,12 +330,18 @@ export component AppWindow inherits Window {
                         root.logout-requested();
                     }
                 }
+
+                if !root.show-details && root.current-tab == 5 : NotificationsView {
+                    width: 100%;
+                    height: 100%;
+                    open-notifications => { root.open-notifications(); }
+                }
             }
 
             // Barra de navegación inferior (Bottom Navigation Bar)
-            Rectangle {
+            if !root.show-details : Rectangle {
                 height: 60px;
-                background: root.is-dark-mode ? #202124 : #ffffff;
+                background: Palette.bg-color;
                 border-width: 1px;
                 border-color: #eeeeee;
 
@@ -333,6 +359,17 @@ export component AppWindow inherits Window {
                         is-active: root.current-tab == 0;
                         clicked => {
                             root.tab-selected(0);
+                        }
+                    }
+
+                    NavItem {
+                        is-dark: root.is-dark-mode;
+                        emoji: "🔔";
+                        label: "Avisos";
+                        is-active: root.current-tab == 5;
+                        clicked => {
+                            root.tab-selected(5);
+                            root.open-notifications();
                         }
                     }
 

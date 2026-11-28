@@ -1,0 +1,109 @@
+import { Palette } from "../palette.slint";
+import { Button, ListView, ScrollView } from "std-widgets.slint";
+
+export struct ChapterData {
+    title: string,
+}
+
+export struct StoryDetailsData {
+    id: string,
+    title: string,
+    author: string,
+    cover: image,
+    description: string,
+}
+
+export component StoryDetailsView inherits Rectangle {
+    background: Palette.bg-color;
+
+    in property <StoryDetailsData> story;
+    in-out property <[ChapterData]> chapters: [];
+
+    callback chapter-clicked(int);
+    callback back-clicked();
+
+    HorizontalLayout {
+        padding: 18px;
+        spacing: 20px;
+
+        VerticalLayout {
+            horizontal-stretch: 3;
+            spacing: 10px;
+
+            Button {
+                text: "‹ Volver";
+                clicked => { root.back-clicked(); }
+            }
+
+            Image {
+                vertical-stretch: 1;
+                source: root.story.cover;
+                image-fit: contain;
+            }
+
+            Text {
+                text: root.story.title;
+                color: Palette.text-color;
+                font-size: 20px;
+                font-weight: 700;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: "por " + root.story.author;
+                color: Palette.text-color;
+                font-size: 14px;
+            }
+
+            ScrollView {
+                vertical-stretch: 1;
+                Text {
+                    text: root.story.description;
+                    color: Palette.text-color;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 7;
+            spacing: 10px;
+
+            Text {
+                text: "Capítulos (" + root.chapters.length + ")";
+                color: Palette.text-color;
+                font-size: 18px;
+                font-weight: 700;
+            }
+
+            ListView {
+                vertical-stretch: 1;
+                for chapter[index] in root.chapters: Rectangle {
+                    height: 52px;
+                    border-width: 1px;
+                    border-color: #eeeeee;
+                    border-radius: 6px;
+                    background: touch.has-hover ? Palette.card-color : Palette.bg-color;
+
+                    touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.chapter-clicked(index); }
+                    }
+
+                    Text {
+                        x: 12px;
+                        y: 0px;
+                        width: parent.width - 24px;
+                        height: parent.height;
+                        text: "Capítulo " + (index + 1) + " - " + chapter.title;
+                        color: Palette.text-color;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -23,12 +23,15 @@ fn actualizar_capitulo_en_ui(app: &AppWindow, state: &AppState) {
     if let Some(chapter) = state.opened_chapters.get(state.current_chapter_index) {
         app.set_reader_chapter_index(state.current_chapter_index as i32);
         app.set_reader_chapter_title(chapter.title.clone().into());
+        let is_dark_mode = app.get_is_dark_mode();
+        let reader_prefs = lector_web::cargar_preferencias_lector(is_dark_mode);
         lector_web::abrir_lector(
             state.opened_story_id.clone(),
             state.opened_story_title.clone(),
             state.opened_chapters.clone(),
             state.current_chapter_index,
-            app.get_is_dark_mode(),
+            is_dark_mode,
+            reader_prefs,
         );
         app.set_is_reading(false);
         app.set_is_loading(false);
@@ -100,7 +103,7 @@ fn cargar_datos_usuario(
                     app.set_profile_followers(perfil.followers.min(i32::MAX as u64) as i32);
                     app.set_profile_following(perfil.following.min(i32::MAX as u64) as i32);
                     app.set_profile_stories_count(
-                        perfil.stories_published.min(i32::MAX as u64) as i32,
+                        perfil.stories_published.min(i32::MAX as u64) as i32
                     );
                     app.set_profile_description(perfil.description.into());
                     if let Some(path) = avatar_path {
@@ -114,7 +117,9 @@ fn cargar_datos_usuario(
         }
 
         // 2. Cargar destacados para Home y biblioteca del usuario (con fallback offline a SQLite)
-        let destacados = api::obtener_destacados(&wp_client).await.unwrap_or_default();
+        let destacados = api::obtener_destacados(&wp_client)
+            .await
+            .unwrap_or_default();
         let home_ui_items = construir_items_biblioteca(&destacados).await;
         if let Ok(mut state) = state_arc.lock() {
             state.home_stories = destacados;
@@ -162,6 +167,8 @@ fn abrir_historia_para_lectura(
     state_arc: Arc<Mutex<AppState>>,
     wp_opt: Option<Arc<WattpadClient>>,
     story_id: String,
+    selected_chapter: Option<usize>,
+    selected_chapter_id: Option<String>,
 ) {
     if let Some(app) = app_weak.upgrade() {
         app.set_is_loading(true);
@@ -221,7 +228,15 @@ fn abrir_historia_para_lectura(
                         .ok()
                         .flatten()
                         .unwrap_or(0);
-                let initial_index = saved_index.min(chapters.len() - 1);
+                let chapter_id_index = selected_chapter_id.as_ref().and_then(|chapter_id| {
+                    chapters
+                        .iter()
+                        .position(|chapter| chapter.id == *chapter_id)
+                });
+                let initial_index = selected_chapter
+                    .or(chapter_id_index)
+                    .unwrap_or(saved_index)
+                    .min(chapters.len() - 1);
 
                 if let Ok(mut state) = state_arc.lock() {
                     state.opened_story_id = story_id.clone();
@@ -259,9 +274,108 @@ fn abrir_historia_para_lectura(
     .unwrap();
 }
 
+fn cargar_detalles_en_ui(
+    app_weak: slint::Weak<AppWindow>,
+    state_arc: Arc<Mutex<AppState>>,
+    wp: Arc<WattpadClient>,
+    story_id: String,
+) {
+    if let Some(app) = app_weak.upgrade() {
+        app.set_is_loading(true);
+        app.set_error_message("".into());
+    }
+    slint::spawn_local(Compat::new(async move {
+        let details_result = match api::obtener_detalles_historia(&wp, &story_id).await {
+            Ok(details) => Ok(details),
+            Err(network_error) => {
+                let credentials = state_arc
+                    .lock()
+                    .ok()
+                    .map(|state| (state.username.clone(), state.password.clone()));
+                if let Some((username, password)) = credentials {
+                    let local_id = story_id.clone();
+                    match tokio::task::spawn_blocking(move || {
+                        if !api::epub_descargado(&local_id) {
+                            return Ok(None);
+                        }
+                        let epub = api::leer_epub_desencriptado(&local_id, &username, &password)?;
+                        Ok::<_, String>(Some(epub))
+                    })
+                    .await
+                    {
+                        Ok(Ok(Some(epub))) => Ok(api::StoryDetails {
+                            id: epub.story.id,
+                            title: epub.story.title,
+                            author: epub.story.author,
+                            cover_url: epub.story.cover_url,
+                            description: String::new(),
+                            chapters: epub
+                                .chapters
+                                .into_iter()
+                                .enumerate()
+                                .map(|(index, chapter)| api::Chapter {
+                                    id: chapter.id,
+                                    title: chapter.title,
+                                    index,
+                                })
+                                .collect(),
+                        }),
+                        _ => Err(network_error),
+                    }
+                } else {
+                    Err(network_error)
+                }
+            }
+        };
+        match details_result {
+            Ok(details) => {
+                let cover = api::descargar_imagen_cache(
+                    &details.cover_url,
+                    &format!("details_cover_{}", details.id),
+                )
+                .await
+                .and_then(|path| slint::Image::load_from_path(&path).ok())
+                .unwrap_or_default();
+                let chapter_items = details
+                    .chapters
+                    .iter()
+                    .map(|chapter| {
+                        let _chapter_identity = (&chapter.id, chapter.index);
+                        ChapterData {
+                            title: chapter.title.clone().into(),
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                if let Some(app) = app_weak.upgrade() {
+                    app.set_current_story(StoryDetailsData {
+                        id: details.id.into(),
+                        title: details.title.into(),
+                        author: details.author.into(),
+                        cover,
+                        description: details.description.into(),
+                    });
+                    app.set_detail_chapters(slint::ModelRc::new(slint::VecModel::from(
+                        chapter_items,
+                    )));
+                    app.set_show_details(true);
+                    app.set_is_loading(false);
+                }
+            }
+            Err(err) => {
+                if let Some(app) = app_weak.upgrade() {
+                    app.set_error_message(err.into());
+                    app.set_is_loading(false);
+                }
+            }
+        }
+    }))
+    .unwrap();
+}
+
 fn limpiar_datos_ui_sesion(app: &AppWindow) {
     app.set_is_logged_in(false);
     app.set_is_reading(false);
+    app.set_show_details(false);
     app.set_current_username("".into());
     app.set_profile_full_name("".into());
     app.set_profile_avatar(slint::Image::default());
@@ -374,15 +488,17 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
+    app.on_open_notifications(lector_web::abrir_notificaciones);
+
     // --- Home: abrir historia destacada ---
     let app_handle_home = app_handle.clone();
     let state_home = Arc::clone(&app_state);
     let wp_home = Arc::clone(&wp_client);
     app.on_home_story_clicked(move |story_id| {
-        abrir_historia_para_lectura(
+        cargar_detalles_en_ui(
             app_handle_home.clone(),
             Arc::clone(&state_home),
-            Some(Arc::clone(&wp_home)),
+            Arc::clone(&wp_home),
             story_id.to_string(),
         );
     });
@@ -488,7 +604,6 @@ fn main() -> Result<(), slint::PlatformError> {
                     }
                 }
             }
-
         }))
         .unwrap();
     });
@@ -599,10 +714,10 @@ fn main() -> Result<(), slint::PlatformError> {
     let state_search_story = Arc::clone(&app_state);
     let wp_search_story = Arc::clone(&wp_client);
     app.on_search_story_clicked(move |story_id| {
-        abrir_historia_para_lectura(
+        cargar_detalles_en_ui(
             app_handle_search_story.clone(),
             Arc::clone(&state_search_story),
-            Some(Arc::clone(&wp_search_story)),
+            Arc::clone(&wp_search_story),
             story_id.to_string(),
         );
     });
@@ -627,7 +742,9 @@ fn main() -> Result<(), slint::PlatformError> {
             let (username, password, salt) = {
                 let Ok(mut state) = state_arc.lock() else {
                     if let Some(app) = app_weak.upgrade() {
-                        app.set_error_message("No se pudo acceder al estado de la aplicación.".into());
+                        app.set_error_message(
+                            "No se pudo acceder al estado de la aplicación.".into(),
+                        );
                         app.set_is_loading(false);
                     }
                     return;
@@ -644,7 +761,10 @@ fn main() -> Result<(), slint::PlatformError> {
 
             match api::descargar_historia_completa(&wp, &id, &username, &password, &salt).await {
                 Ok(num_capitulos) => {
-                    println!("Historia {} descargada y encriptada ({} capítulos).", id, num_capitulos);
+                    println!(
+                        "Historia {} descargada y encriptada ({} capítulos).",
+                        id, num_capitulos
+                    );
                     if let Some(app) = app_weak.upgrade() {
                         let model = app.get_library_stories();
                         let updated: Vec<LibraryStoryItem> = model
@@ -684,12 +804,38 @@ fn main() -> Result<(), slint::PlatformError> {
     let wp_read = Arc::clone(&wp_client);
 
     app.on_read_story_requested(move |story_id| {
-        abrir_historia_para_lectura(
+        cargar_detalles_en_ui(
             app_handle_read.clone(),
             Arc::clone(&state_read),
-            Some(Arc::clone(&wp_read)),
+            Arc::clone(&wp_read),
             story_id.to_string(),
         );
+    });
+
+    let app_handle_chapter = app_handle.clone();
+    let state_chapter = Arc::clone(&app_state);
+    let wp_chapter = Arc::clone(&wp_client);
+    app.on_chapter_clicked(move |chapter_index| {
+        let Some(app) = app_handle_chapter.upgrade() else {
+            return;
+        };
+        let story_id = app.get_current_story().id.to_string();
+        abrir_historia_para_lectura(
+            app_handle_chapter.clone(),
+            Arc::clone(&state_chapter),
+            Some(Arc::clone(&wp_chapter)),
+            story_id,
+            Some(chapter_index.max(0) as usize),
+            None,
+        );
+    });
+
+    let app_handle_details_back = app_handle.clone();
+    app.on_details_back_clicked(move || {
+        if let Some(app) = app_handle_details_back.upgrade() {
+            app.set_show_details(false);
+            app.set_error_message("".into());
+        }
     });
 
     // --- Controles del lector ---

@@ -1,0 +1,42 @@
+import { Palette } from "../palette.slint";
+
+export component NotificationsView inherits Rectangle {
+    background: Palette.bg-color;
+    callback open-notifications();
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 18px;
+
+        Text {
+            text: "Notificaciones y actividad";
+            color: Palette.text-color;
+            font-size: 22px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+
+        Rectangle {
+            width: 360px;
+            height: 76px;
+            border-radius: 12px;
+            background: #ff500a;
+
+            touch := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.open-notifications(); }
+            }
+
+            Text {
+                width: parent.width;
+                height: parent.height;
+                text: "Abrir Notificaciones de Wattpad";
+                color: #ffffff;
+                font-size: 17px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
